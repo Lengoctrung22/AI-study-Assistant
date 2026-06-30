@@ -30,6 +30,16 @@ const userSchema = new mongoose.Schema({
     enum: ['free', 'premium'],
     default: 'free',
   },
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user',
+  },
+  tutorPersona: {
+    type: String,
+    enum: ['friendly', 'strict', 'socratic', 'encouraging', 'concise'],
+    default: 'friendly',
+  },
 }, {
   timestamps: true,
 });

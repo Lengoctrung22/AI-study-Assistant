@@ -11,6 +11,11 @@ import DocumentDetailPage from './pages/DocumentDetailPage';
 import ChatPage from './pages/ChatPage';
 import FlashcardsPage from './pages/FlashcardsPage';
 import QuizPage from './pages/QuizPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import StudyPlanPage from './pages/StudyPlanPage';
+import AIToolsPage from './pages/AIToolsPage';
+import AdminLayout from './components/layout/AdminLayout';
+import AdminDashboardPage from './pages/AdminDashboardPage';
 
 function App() {
   return (
@@ -32,6 +37,19 @@ function App() {
               <Route path="/flashcards/:id" element={<FlashcardsPage />} />
               <Route path="/quiz" element={<QuizPage />} />
               <Route path="/quiz/:id" element={<QuizPage />} />
+              {/* Premium pages */}
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/study-plan" element={<StudyPlanPage />} />
+              <Route path="/ai-tools" element={<AIToolsPage />} />
+            </Route>
+            {/* Admin layout and routes */}
+            <Route element={<AdminLayout />}>
+              <Route path="/admin" element={<AdminDashboardPage />} />
+              <Route path="/admin/users" element={<AdminDashboardPage />} />
+              <Route path="/admin/documents" element={<AdminDashboardPage />} />
+              <Route path="/admin/api-settings" element={<AdminDashboardPage />} />
+              <Route path="/admin/billing" element={<AdminDashboardPage />} />
+              <Route path="/admin/logs" element={<AdminDashboardPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

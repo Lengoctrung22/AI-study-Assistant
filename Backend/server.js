@@ -12,6 +12,9 @@ const documentRoutes = require('./routes/documentRoutes');
 const flashcardRoutes = require('./routes/flashcardRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const premiumRoutes = require('./routes/premiumRoutes');
+const studyPlanRoutes = require('./routes/studyPlanRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
@@ -29,6 +32,9 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/premium', premiumRoutes);
+app.use('/api/study-plan', studyPlanRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

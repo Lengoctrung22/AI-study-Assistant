@@ -45,6 +45,27 @@ const documentSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  // Premium feature caches
+  mindMap: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+  concepts: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+  multiLevelSummary: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+  analytics: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+  glossary: {
+    type: [mongoose.Schema.Types.Mixed],
+    default: undefined,
+  },
 }, {
   timestamps: true,
 });

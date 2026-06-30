@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import ReactMarkdown from 'react-markdown';
-import { HiOutlineChatBubbleLeftRight, HiOutlineRectangleStack, HiOutlineClipboardDocumentCheck, HiOutlineLightBulb, HiOutlineArrowPath, HiOutlineArrowLeft } from 'react-icons/hi2';
+import { useAuth } from '../context/AuthContext';
+import { HiOutlineChatBubbleLeftRight, HiOutlineRectangleStack, HiOutlineClipboardDocumentCheck, HiOutlineLightBulb, HiOutlineArrowPath, HiOutlineArrowLeft, HiOutlineChartBarSquare, HiOutlineSparkles } from 'react-icons/hi2';
 import toast from 'react-hot-toast';
 
 export default function DocumentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isPremium = user?.plan === 'premium';
   const [doc, setDoc] = useState(null);
   const [loading, setLoading] = useState(true);
   const [explainText, setExplainText] = useState('');
@@ -92,6 +95,16 @@ export default function DocumentDetailPage() {
         <button className="btn btn-secondary" onClick={() => handleGenerate('resummarize')} disabled={!!genLoading}>
           {genLoading === 'resummarize' ? <div className="spinner" style={{ width: 16, height: 16 }} /> : <HiOutlineArrowPath />}
           Tóm tắt lại
+        </button>
+      </div>
+
+      {/* Premium AI Study Tools Action Buttons */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginBottom: 24 }}>
+        <button className={`btn ${isPremium ? 'btn-primary' : 'btn-secondary nav-link-locked'}`} onClick={() => navigate(`/analytics?documentId=${id}`)} style={isPremium ? { background: 'linear-gradient(135deg, #10b981, #059669)' } : {}}>
+          <HiOutlineChartBarSquare /> Phân tích & Thuật ngữ {!isPremium && '🔒'}
+        </button>
+        <button className={`btn ${isPremium ? 'btn-primary' : 'btn-secondary nav-link-locked'}`} onClick={() => navigate(`/ai-tools?documentId=${id}`)} style={isPremium ? { background: 'linear-gradient(135deg, #f59e0b, #d97706)' } : {}}>
+          <HiOutlineSparkles /> Sơ đồ tư duy & Tóm tắt AI {!isPremium && '🔒'}
         </button>
       </div>
 
