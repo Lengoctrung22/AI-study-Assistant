@@ -35,10 +35,22 @@ const userSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user',
   },
+  subscriptionType: {
+    type: String,
+    default: null,
+  },
+  premiumExpiresAt: {
+    type: Date,
+    default: null,
+  },
   tutorPersona: {
     type: String,
     enum: ['friendly', 'strict', 'socratic', 'encouraging', 'concise'],
     default: 'friendly',
+  },
+  isLocked: {
+    type: Boolean,
+    default: false,
   },
 }, {
   timestamps: true,

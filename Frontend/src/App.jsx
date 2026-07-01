@@ -16,8 +16,14 @@ import StudyPlanPage from './pages/StudyPlanPage';
 import AIToolsPage from './pages/AIToolsPage';
 import AdminLayout from './components/layout/AdminLayout';
 import AdminDashboardPage from './pages/AdminDashboardPage';
+import PricingPage from './pages/PricingPage';
+import usePWA from './hooks/usePWA';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
+import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 
 function App() {
+  const { isInstallable, installApp, needRefresh, updateServiceWorker } = usePWA();
+
   return (
     <BrowserRouter>
       <ThemeProvider>
@@ -25,6 +31,8 @@ function App() {
           <Toaster position="top-right" toastOptions={{
             style: { background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 12, fontSize: 14 },
           }} />
+          <PWAInstallPrompt isInstallable={isInstallable} installApp={installApp} />
+          <PWAUpdatePrompt needRefresh={needRefresh} updateServiceWorker={updateServiceWorker} />
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -41,6 +49,7 @@ function App() {
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/study-plan" element={<StudyPlanPage />} />
               <Route path="/ai-tools" element={<AIToolsPage />} />
+              <Route path="/pricing" element={<PricingPage />} />
             </Route>
             {/* Admin layout and routes */}
             <Route element={<AdminLayout />}>
@@ -49,6 +58,7 @@ function App() {
               <Route path="/admin/documents" element={<AdminDashboardPage />} />
               <Route path="/admin/api-settings" element={<AdminDashboardPage />} />
               <Route path="/admin/billing" element={<AdminDashboardPage />} />
+              <Route path="/admin/packages" element={<AdminDashboardPage />} />
               <Route path="/admin/logs" element={<AdminDashboardPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,6 +1,6 @@
 import { Outlet, Navigate, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { HiOutlineDocumentText, HiOutlineChartBarSquare, HiOutlineArrowRightOnRectangle, HiOutlineUserGroup, HiOutlineCpuChip, HiOutlineCreditCard, HiOutlineClipboardDocumentList, HiOutlineAcademicCap } from 'react-icons/hi2';
+import { HiOutlineDocumentText, HiOutlineChartBarSquare, HiOutlineArrowRightOnRectangle, HiOutlineUserGroup, HiOutlineCpuChip, HiOutlineCreditCard, HiOutlineClipboardDocumentList, HiOutlineAcademicCap, HiOutlineCurrencyDollar } from 'react-icons/hi2';
 
 export default function AdminLayout() {
   const { user, loading, logout } = useAuth();
@@ -27,7 +27,8 @@ export default function AdminLayout() {
     { to: '/admin/users', icon: <HiOutlineUserGroup />, label: 'Quản lý người dùng' },
     { to: '/admin/documents', icon: <HiOutlineDocumentText />, label: 'Tài liệu & Lưu trữ' },
     { to: '/admin/api-settings', icon: <HiOutlineCpuChip />, label: 'Cài đặt API & LLM' },
-    { to: '/admin/billing', icon: <HiOutlineCreditCard />, label: 'Gói đăng ký & Premium' },
+    { to: '/admin/packages', icon: <HiOutlineCurrencyDollar />, label: 'Quản lý gói dịch vụ' },
+    { to: '/admin/billing', icon: <HiOutlineCreditCard />, label: 'Lịch sử giao dịch' },
     { to: '/admin/logs', icon: <HiOutlineClipboardDocumentList />, label: 'Nhật ký hệ thống' },
   ];
 

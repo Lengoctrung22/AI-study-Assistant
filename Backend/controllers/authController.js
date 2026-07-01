@@ -53,6 +53,10 @@ exports.login = async (req, res, next) => {
       return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
     }
 
+    if (user.isLocked) {
+      return res.status(403).json({ message: 'Tài khoản của bạn đã bị khóa bởi quản trị viên' });
+    }
+
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
@@ -85,6 +89,8 @@ exports.getMe = async (req, res, next) => {
         email: req.user.email,
         plan: req.user.plan,
         role: req.user.role,
+        subscriptionType: req.user.subscriptionType,
+        premiumExpiresAt: req.user.premiumExpiresAt,
         createdAt: req.user.createdAt,
       },
     });

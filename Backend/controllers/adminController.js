@@ -2,9 +2,13 @@ const User = require('../models/User');
 const Document = require('../models/Document');
 const mongoose = require('mongoose');
 const { execSync } = require('child_process');
+const fs = require('fs');
+const { deleteDocumentChunks } = require('../services/embeddingService');
 
 const LlmLog = require('../models/LlmLog');
 const ChatSession = require('../models/ChatSession');
+const Payment = require('../models/Payment');
+const PricingPlan = require('../models/PricingPlan');
 
 // GET /api/admin/stats
 exports.getStats = async (req, res, next) => {
@@ -349,5 +353,301 @@ exports.getHealth = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+// POST /api/admin/users
+exports.createUser = async (req, res, next) => {
+  try {
+    const { name, email, password, role, plan } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin bắt buộc' });
+    }
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email đã tồn tại' });
+    }
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: role || 'user',
+      plan: plan || 'free'
+    });
+    res.status(201).json({ message: 'Đã tạo người dùng thành công', user });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PUT /api/admin/users/:userId/role
+exports.updateUserRole = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+    if (!['user', 'admin'].includes(role)) {
+      return res.status(400).json({ message: 'Vai trò không hợp lệ' });
+    }
+    const user = await User.findByIdAndUpdate(userId, { role }, { new: true });
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+    res.json({ message: 'Cập nhật vai trò thành công', user });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PUT /api/admin/users/:userId/plan
+exports.updateUserPlan = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { plan } = req.body;
+    if (!['free', 'premium'].includes(plan)) {
+      return res.status(400).json({ message: 'Gói dịch vụ không hợp lệ' });
+    }
+    const user = await User.findByIdAndUpdate(userId, { plan }, { new: true });
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+    res.json({ message: 'Cập nhật gói dịch vụ thành công', user });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PUT /api/admin/users/:userId/lock
+exports.toggleUserLock = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { isLocked } = req.body;
+    
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json({ message: 'Bạn không thể tự khóa tài khoản của chính mình' });
+    }
+
+    const user = await User.findByIdAndUpdate(userId, { isLocked }, { new: true });
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+    
+    res.json({ 
+      message: user.isLocked ? 'Đã khóa tài khoản người dùng thành công' : 'Đã mở khóa tài khoản người dùng thành công', 
+      user 
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE /api/admin/users/:userId
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+    
+    // Find all documents of this user to clean up files and embeddings
+    const docs = await Document.find({ userId });
+    for (const doc of docs) {
+      if (fs.existsSync(doc.filePath)) {
+        fs.unlinkSync(doc.filePath);
+      }
+      try {
+        await deleteDocumentChunks(doc._id);
+      } catch (e) {
+        console.warn('ChromaDB delete failed during user cleanup:', e.message);
+      }
+      await Document.findByIdAndDelete(doc._id);
+    }
+
+    // Delete user's chat sessions
+    await ChatSession.deleteMany({ userId });
+
+    // Finally delete the user
+    await User.findByIdAndDelete(userId);
+
+    res.json({ message: 'Đã xóa người dùng và toàn bộ dữ liệu liên quan thành công' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/admin/documents/:id
+exports.adminGetDocumentDetails = async (req, res, next) => {
+  try {
+    const doc = await Document.findById(req.params.id).populate('userId', 'name email');
+    if (!doc) {
+      return res.status(404).json({ message: 'Không tìm thấy tài liệu' });
+    }
+    res.json({ document: doc });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE /api/admin/documents/:id
+exports.adminDeleteDocument = async (req, res, next) => {
+  try {
+    const doc = await Document.findById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ message: 'Không tìm thấy tài liệu' });
+    }
+    if (fs.existsSync(doc.filePath)) {
+      fs.unlinkSync(doc.filePath);
+    }
+    try {
+      await deleteDocumentChunks(doc._id);
+    } catch (e) {
+      console.warn('ChromaDB delete failed:', e.message);
+    }
+    await Document.findByIdAndDelete(doc._id);
+    res.json({ message: 'Đã xóa tài liệu thành công (Admin)' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/admin/payments
+exports.getPayments = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const payments = await Payment.find()
+      .populate('userId', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Payment.countDocuments();
+
+    res.json({
+      payments,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/admin/logs
+exports.getLlmLogs = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const logs = await LlmLog.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await LlmLog.countDocuments();
+
+    res.json({
+      logs,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/admin/plans
+exports.getAdminPlans = async (req, res, next) => {
+  try {
+    const plans = await PricingPlan.find().sort({ price: 1 });
+    res.json({ plans });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/admin/plans
+exports.createPlan = async (req, res, next) => {
+  try {
+    const { name, code, price, durationMonths, description, features, isActive } = req.body;
+    
+    if (!name || !code || price === undefined || !durationMonths) {
+      return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin bắt buộc' });
+    }
+
+    const existingPlan = await PricingPlan.findOne({ code: code.toLowerCase() });
+    if (existingPlan) {
+      return res.status(400).json({ message: 'Mã gói này đã tồn tại' });
+    }
+
+    const plan = await PricingPlan.create({
+      name,
+      code: code.toLowerCase(),
+      price,
+      durationMonths,
+      description: description || '',
+      features: features || [],
+      isActive: isActive !== undefined ? isActive : true,
+    });
+
+    res.status(201).json({ message: 'Đã tạo gói dịch vụ thành công', plan });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PUT /api/admin/plans/:id
+exports.updatePlan = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, code, price, durationMonths, description, features, isActive } = req.body;
+
+    const plan = await PricingPlan.findById(id);
+    if (!plan) {
+      return res.status(404).json({ message: 'Không tìm thấy gói dịch vụ' });
+    }
+
+    if (code && code.toLowerCase() !== plan.code) {
+      const existing = await PricingPlan.findOne({ code: code.toLowerCase() });
+      if (existing) {
+        return res.status(400).json({ message: 'Mã gói mới đã tồn tại' });
+      }
+      plan.code = code.toLowerCase();
+    }
+
+    if (name) plan.name = name;
+    if (price !== undefined) plan.price = price;
+    if (durationMonths) plan.durationMonths = durationMonths;
+    if (description !== undefined) plan.description = description;
+    if (features) plan.features = features;
+    if (isActive !== undefined) plan.isActive = isActive;
+
+    await plan.save();
+    res.json({ message: 'Cập nhật gói dịch vụ thành công', plan });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE /api/admin/plans/:id
+exports.deletePlan = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const plan = await PricingPlan.findByIdAndDelete(id);
+    if (!plan) {
+      return res.status(404).json({ message: 'Không tìm thấy gói dịch vụ' });
+    }
+    res.json({ message: 'Đã xóa gói dịch vụ thành công' });
+  } catch (err) {
+    next(err);
   }
 };

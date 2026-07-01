@@ -16,6 +16,10 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ message: 'Token không hợp lệ' });
     }
 
+    if (user.isLocked) {
+      return res.status(403).json({ message: 'Tài khoản của bạn đã bị khóa bởi quản trị viên' });
+    }
+
     req.user = user;
     next();
   } catch (error) {

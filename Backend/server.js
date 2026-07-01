@@ -15,6 +15,7 @@ const chatRoutes = require('./routes/chatRoutes');
 const premiumRoutes = require('./routes/premiumRoutes');
 const studyPlanRoutes = require('./routes/studyPlanRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
@@ -35,11 +36,22 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/premium', premiumRoutes);
 app.use('/api/study-plan', studyPlanRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Serve frontend static files in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '..', 'Frontend', 'dist')));
+  app.get(/.*/, (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(__dirname, '..', 'Frontend', 'dist', 'index.html'));
+    }
+  });
+}
 
 // Error handler
 app.use(errorHandler);
