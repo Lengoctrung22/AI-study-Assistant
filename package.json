@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "AI Study Assistant Root Workspace",
   "scripts": {
-    "install:all": "npm install && npm install --prefix Backend && npm install --prefix Frontend",
+    "install:all": "npm install --include=dev && npm install --include=dev --prefix Backend && npm install --include=dev --prefix Frontend",
     "dev": "concurrently -n \"api,app\" -c \"bgBlue,bgGreen\" \"npm run dev --prefix Backend\" \"npm run dev --prefix Frontend\"",
     "build:frontend": "npm run build --prefix Frontend",
     "start": "cross-env NODE_ENV=production node Backend/server.js"
