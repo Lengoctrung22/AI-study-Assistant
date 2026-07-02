@@ -23,7 +23,20 @@ export default function DocumentsPage() {
   useEffect(() => { loadDocs(); }, []);
 
   const handleUpload = async (file) => {
-    if (!file || file.type !== 'application/pdf') return toast.error('Chỉ hỗ trợ file PDF');
+    if (!file) return;
+    
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword'
+    ];
+    const allowedExtensions = ['.pdf', '.docx', '.doc'];
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(ext)) {
+      return toast.error('Chỉ hỗ trợ file PDF hoặc Word (.docx, .doc)');
+    }
+
     setUploading(true);
     try {
       const formData = new FormData();
@@ -53,7 +66,7 @@ export default function DocumentsPage() {
     <div className="page-container fade-in">
       <div className="page-header">
         <h1>Tài liệu</h1>
-        <p>Upload và quản lý tài liệu PDF của bạn</p>
+        <p>Upload và quản lý tài liệu PDF hoặc Word của bạn</p>
       </div>
 
       <div className={`upload-zone ${dragOver ? 'drag-over' : ''}`}
@@ -61,9 +74,9 @@ export default function DocumentsPage() {
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}>
-        <input ref={fileRef} type="file" accept=".pdf" hidden onChange={(e) => handleUpload(e.target.files[0])} />
+        <input ref={fileRef} type="file" accept=".pdf,.docx,.doc" hidden onChange={(e) => handleUpload(e.target.files[0])} />
         <div className="upload-zone-icon"><HiOutlineCloudArrowUp /></div>
-        <h3>{uploading ? 'Đang upload...' : 'Kéo thả PDF vào đây'}</h3>
+        <h3>{uploading ? 'Đang upload...' : 'Kéo thả PDF hoặc Word vào đây'}</h3>
         <p>hoặc click để chọn file (tối đa 10MB)</p>
       </div>
 
@@ -73,7 +86,7 @@ export default function DocumentsPage() {
         <div className="card empty-state">
           <div className="empty-state-icon">📚</div>
           <h3>Chưa có tài liệu nào</h3>
-          <p>Upload file PDF để bắt đầu</p>
+          <p>Upload file PDF hoặc Word để bắt đầu</p>
         </div>
       ) : (
         <div className="doc-grid">

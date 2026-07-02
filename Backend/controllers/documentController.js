@@ -12,7 +12,7 @@ const fs = require('fs');
 exports.uploadDocument = async (req, res, next) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: 'Vui lòng upload file PDF' });
+      return res.status(400).json({ message: 'Vui lòng upload file PDF hoặc Word (.docx, .doc)' });
     }
 
     // Fix encoding for Vietnamese filenames
@@ -21,7 +21,7 @@ exports.uploadDocument = async (req, res, next) => {
     // Create document record
     const document = await Document.create({
       userId: req.user._id,
-      title: utf8Name.replace('.pdf', ''),
+      title: utf8Name.replace(/\.(pdf|docx|doc)$/i, ''),
       fileName: utf8Name,
       filePath: req.file.path,
       fileSize: req.file.size,

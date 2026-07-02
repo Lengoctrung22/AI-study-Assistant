@@ -600,8 +600,8 @@ export default function DashboardPage() {
             {recentDocs.length === 0 ? (
               <div style={{ padding: '30px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
                 <p style={{ margin: 0, fontSize: 14 }}>Bạn chưa tải lên tài liệu nào.</p>
-                <p style={{ margin: '4px 0 16px 0', fontSize: 12 }}>Tải file PDF ngay để bắt đầu tóm tắt và làm trắc nghiệm.</p>
-                <button className="btn btn-secondary btn-sm" onClick={() => navigate('/documents')}>Tải PDF lên</button>
+                <p style={{ margin: '4px 0 16px 0', fontSize: 12 }}>Tải file PDF hoặc Word ngay để bắt đầu tóm tắt và làm trắc nghiệm.</p>
+                <button className="btn btn-secondary btn-sm" onClick={() => navigate('/documents')}>Tải tài liệu lên</button>
               </div>
             ) : (
               <div className="dashboard-table-wrap">

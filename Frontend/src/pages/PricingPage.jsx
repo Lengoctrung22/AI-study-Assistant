@@ -7,7 +7,7 @@ import { HiOutlineCheck, HiOutlineXMark, HiOutlineCreditCard, HiOutlineShieldChe
 import { PiCrownBold } from 'react-icons/pi';
 
 const FREE_FEATURES = [
-  { text: 'Upload tài liệu PDF', included: true },
+  { text: 'Upload tài liệu PDF, Word (.docx)', included: true },
   { text: 'Tạo Flashcards (giới hạn)', included: true },
   { text: 'Tạo Quiz (giới hạn)', included: true },
   { text: 'Chat AI cơ bản', included: true },
@@ -18,7 +18,7 @@ const FREE_FEATURES = [
 ];
 
 const PREMIUM_FEATURES = [
-  { text: 'Upload tài liệu PDF', included: true },
+  { text: 'Upload tài liệu PDF, Word (.docx)', included: true },
   { text: 'Tạo Flashcards không giới hạn', included: true },
   { text: 'Tạo Quiz không giới hạn', included: true },
   { text: 'Chat AI nâng cao (Tutor cá nhân)', included: true },

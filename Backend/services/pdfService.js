@@ -1,11 +1,31 @@
 const fs = require('fs');
+const path = require('path');
 const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 
 /**
- * Parse PDF file and extract text content
+ * Parse PDF or Word (.docx) file and extract text content
  */
 const parsePDF = async (filePath) => {
   try {
+    const ext = path.extname(filePath).toLowerCase();
+
+    if (ext === '.docx' || ext === '.doc') {
+      const result = await mammoth.extractRawText({ path: filePath });
+      const text = result.value || '';
+      
+      // Estimate page count (standard page has ~400 words)
+      const wordCount = text.split(/\s+/).filter(Boolean).length;
+      const pageCount = Math.max(1, Math.ceil(wordCount / 400));
+
+      return {
+        text,
+        pageCount,
+        info: { Title: path.basename(filePath) }
+      };
+    }
+
+    // Default to PDF parsing
     const dataBuffer = fs.readFileSync(filePath);
     const data = await pdfParse(dataBuffer);
 
@@ -15,8 +35,10 @@ const parsePDF = async (filePath) => {
       info: data.info,
     };
   } catch (error) {
-    console.error('PDF Parse Error:', error.message);
-    throw new Error(`Không thể đọc file PDF: ${error.message}`);
+    const ext = path.extname(filePath).toLowerCase();
+    const isWord = ext === '.docx' || ext === '.doc';
+    console.error(`${isWord ? 'Word' : 'PDF'} Parse Error:`, error.message);
+    throw new Error(`Không thể đọc file ${isWord ? 'Word (.docx)' : 'PDF'}: ${error.message}`);
   }
 };
 

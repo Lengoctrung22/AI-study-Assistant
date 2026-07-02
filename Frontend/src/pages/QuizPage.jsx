@@ -139,7 +139,7 @@ export default function QuizPage() {
         <div className="card empty-state">
           <div className="empty-state-icon">📝</div>
           <h3>Chưa có bài quiz</h3>
-          <p>Mở tài liệu và tạo quiz từ nội dung PDF</p>
+          <p>Mở tài liệu và tạo quiz từ nội dung tài liệu học tập của bạn</p>
           <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => navigate('/documents')}>Mở tài liệu</button>
         </div>
       ) : (

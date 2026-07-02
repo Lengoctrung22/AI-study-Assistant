@@ -18,10 +18,18 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype === 'application/pdf') {
+  const allowedMimeTypes = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword'
+  ];
+  const allowedExtensions = ['.pdf', '.docx', '.doc'];
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  if (allowedMimeTypes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Chỉ hỗ trợ file PDF'), false);
+    cb(new Error('Chỉ hỗ trợ file PDF hoặc Word (.docx, .doc)'), false);
   }
 };
 
