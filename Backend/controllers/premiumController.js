@@ -217,6 +217,14 @@ exports.getWeakAreas = async (req, res, next) => {
             topicStats[topic].incorrect++;
           }
         }
+        // For short_answer
+        else if (q.type === 'short_answer') {
+          const user = String(userAnswer || '').toLowerCase().trim();
+          const correct = String(q.shortAnswer || '').toLowerCase().trim();
+          if (!user || !(user === correct || correct.includes(user) || user.includes(correct))) {
+            topicStats[topic].incorrect++;
+          }
+        }
       });
     });
 

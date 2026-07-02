@@ -407,7 +407,7 @@ export default function DashboardPage() {
       <div className="dashboard-glass dashboard-activity-chart stagger-in stagger-in-3">
         <div className="dashboard-chart-header">
           <div className="dashboard-chart-header-left">
-            <h3>Thời gian học spending (phút)</h3>
+            <h3>Thời lượng học tập (phút)</h3>
             <p>Thống kê thời lượng bạn tương tác học tập với AI</p>
           </div>
           <div className="dashboard-chart-toggle">

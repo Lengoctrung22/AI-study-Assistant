@@ -217,12 +217,13 @@ exports.getStreak = async (req, res, next) => {
       .limit(365)
       .select('date totalMinutes');
 
-    const streak = calculateStreak(activities);
+    const activeActivities = activities.filter((a) => a.totalMinutes > 0);
+    const streak = calculateStreak(activeActivities);
 
     // Get longest streak
     let longestStreak = 0;
     let currentStreak = 0;
-    const sorted = [...activities].sort((a, b) => a.date.localeCompare(b.date));
+    const sorted = [...activeActivities].sort((a, b) => a.date.localeCompare(b.date));
 
     for (let i = 0; i < sorted.length; i++) {
       if (i === 0) {
@@ -245,7 +246,7 @@ exports.getStreak = async (req, res, next) => {
     res.json({
       currentStreak: streak,
       longestStreak,
-      totalStudyDays: activities.length,
+      totalStudyDays: activeActivities.length,
       totalMinutes,
       totalHours: Math.round(totalMinutes / 60 * 10) / 10,
       recentActivity: activities.slice(0, 30),

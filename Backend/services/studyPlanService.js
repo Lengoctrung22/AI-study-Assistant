@@ -33,8 +33,12 @@ const getTodayString = () => {
 const calculateStreak = (activities) => {
   if (!activities || activities.length === 0) return 0;
 
+  // Filter out days with 0 minutes of study time
+  const activeActivities = activities.filter((a) => a.totalMinutes > 0);
+  if (activeActivities.length === 0) return 0;
+
   // Sort by date descending
-  const sorted = [...activities].sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = [...activeActivities].sort((a, b) => b.date.localeCompare(a.date));
   const today = getTodayString();
 
   let streak = 0;

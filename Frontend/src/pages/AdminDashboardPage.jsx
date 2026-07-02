@@ -488,9 +488,11 @@ export default function AdminDashboardPage() {
         </div>
 
         <div className="admin-header-right">
-          <button className="admin-btn admin-btn-primary" onClick={() => setShowAddUserModal(true)}>
-            + Thêm người dùng
-          </button>
+          {activeTab === 'users' && (
+            <button className="admin-btn admin-btn-primary" onClick={() => setShowAddUserModal(true)}>
+              + Thêm người dùng
+            </button>
+          )}
         </div>
       </header>
 

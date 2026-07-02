@@ -168,7 +168,7 @@ exports.submitQuiz = async (req, res, next) => {
         // Simplified check — exact match or close enough
         const user = String(userAnswer || '').toLowerCase().trim();
         const correct = String(q.shortAnswer || '').toLowerCase().trim();
-        if (user === correct || correct.includes(user) || user.includes(correct)) score++;
+        if (user && (user === correct || correct.includes(user) || user.includes(correct))) score++;
       }
     });
 
@@ -298,6 +298,13 @@ exports.getQuizAnalytics = async (req, res, next) => {
         if (qType === 'mcq' && userAnswer === q.correctAnswer) topicPerformance[topic].correct++;
         else if (qType === 'true_false' && userAnswer === q.correctBoolean) topicPerformance[topic].correct++;
         else if (qType === 'fill_blank' && String(userAnswer || '').toLowerCase().trim() === String(q.blankAnswer || '').toLowerCase().trim()) topicPerformance[topic].correct++;
+        else if (qType === 'short_answer') {
+          const user = String(userAnswer || '').toLowerCase().trim();
+          const correct = String(q.shortAnswer || '').toLowerCase().trim();
+          if (user && (user === correct || correct.includes(user) || user.includes(correct))) {
+            topicPerformance[topic].correct++;
+          }
+        }
       });
     });
 
