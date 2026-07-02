@@ -28,6 +28,14 @@ exports.generateFromDocument = async (req, res, next) => {
       cards,
     });
 
+    // Record study activity (flashcard creation = 10 mins)
+    try {
+      const { recordActivity } = require('../services/activityService');
+      await recordActivity(req.user._id, 'flashcard_review', 10, document._id);
+    } catch (actError) {
+      console.error('Failed to log flashcard creation activity:', actError.message);
+    }
+
     res.status(201).json({ flashcardSet });
   } catch (error) {
     next(error);
@@ -112,6 +120,14 @@ exports.reviewCard = async (req, res, next) => {
 
     set.totalReviews += 1;
     await set.save();
+
+    // Record study activity (flashcard review = 2 mins per card)
+    try {
+      const { recordActivity } = require('../services/activityService');
+      await recordActivity(req.user._id, 'flashcard_review', 2, set.documentId);
+    } catch (actError) {
+      console.error('Failed to log flashcard review activity:', actError.message);
+    }
 
     res.json({ card: set.cards[cardIndex], totalReviews: set.totalReviews });
   } catch (error) {

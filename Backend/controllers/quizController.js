@@ -186,6 +186,15 @@ exports.submitQuiz = async (req, res, next) => {
 
     await quiz.save();
 
+    // Record study activity (quiz completion = time spent or 15 mins)
+    try {
+      const { recordActivity } = require('../services/activityService');
+      const duration = Math.max(5, Math.ceil((timeSpent || 900) / 60)); // convert seconds to minutes, default to 15 mins
+      await recordActivity(req.user._id, 'quiz_complete', duration, quiz.documentId);
+    } catch (actError) {
+      console.error('Failed to log quiz completion activity:', actError.message);
+    }
+
     res.json({
       result: quiz.result,
       questions: quiz.questions,

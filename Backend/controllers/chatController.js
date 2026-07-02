@@ -73,6 +73,14 @@ exports.sendMessage = async (req, res, next) => {
 
     await session.save();
 
+    // Record study activity (chat message = 5 mins)
+    try {
+      const { recordActivity } = require('../services/activityService');
+      await recordActivity(req.user._id, 'chat_message', 5, documentId);
+    } catch (actError) {
+      console.error('Failed to log chat activity:', actError.message);
+    }
+
     res.json({
       sessionId: session._id,
       answer,
@@ -203,6 +211,15 @@ exports.sendMultiDocMessage = async (req, res, next) => {
       pageNumber: chunk.metadata.pageNumber || null,
       documentTitle: chunk.metadata.documentTitle,
     }));
+
+    // Record study activity (multi-doc chat message = 5 mins)
+    try {
+      const { recordActivity } = require('../services/activityService');
+      // Use the first document ID as reference
+      await recordActivity(req.user._id, 'chat_message', 5, documentIds[0]);
+    } catch (actError) {
+      console.error('Failed to log multi-doc chat activity:', actError.message);
+    }
 
     res.json({ answer, citations, suggestedQuestions });
   } catch (error) {

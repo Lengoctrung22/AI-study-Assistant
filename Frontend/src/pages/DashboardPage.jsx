@@ -113,12 +113,34 @@ export default function DashboardPage() {
           });
         }
 
+        // Fetch Streak Info and Heatmap Data (available to ALL tiers)
+        try {
+          const [streakRes, heatmapRes] = await Promise.all([
+            api.get('/study-plan/streak'),
+            api.get('/study-plan/heatmap')
+          ]);
+          
+          if (streakRes.data) {
+            const streakData = streakRes.data;
+            setStreakInfo({
+              currentStreak: streakData.currentStreak || 0,
+              longestStreak: streakData.longestStreak || 0,
+              totalStudyDays: streakData.totalStudyDays || 0,
+              totalMinutes: streakData.totalMinutes || 0
+            });
+          }
+
+          if (heatmapRes.data) {
+            setHeatmapData(heatmapRes.data.heatmap || []);
+          }
+        } catch (statsErr) {
+          console.warn("Failed to fetch study activity stats:", statsErr.message);
+        }
+
         // Fetch Premium Data
         if (isPremium) {
           const results = await Promise.allSettled([
             api.get('/study-plan'),
-            api.get('/study-plan/streak'),
-            api.get('/study-plan/heatmap'),
             api.get('/quiz/analytics')
           ]);
 
@@ -146,25 +168,9 @@ export default function DashboardPage() {
             }
           }
 
-          // Handle Streak Info
-          if (results[1].status === 'fulfilled') {
-            const streakData = results[1].value.data;
-            setStreakInfo({
-              currentStreak: streakData.currentStreak || 0,
-              longestStreak: streakData.longestStreak || 0,
-              totalStudyDays: streakData.totalStudyDays || 0,
-              totalMinutes: streakData.totalMinutes || 0
-            });
-          }
-
-          // Handle Heatmap Data
-          if (results[2].status === 'fulfilled') {
-            setHeatmapData(results[2].value.data.heatmap || []);
-          }
-
           // Handle Quiz Analytics
-          if (results[3].status === 'fulfilled' && results[3].value.data.analytics) {
-            const a = results[3].value.data.analytics;
+          if (results[1].status === 'fulfilled' && results[1].value.data.analytics) {
+            const a = results[1].value.data.analytics;
             setQuizStats({
               averageScore: a.averageScore || 0,
               total: a.totalQuizzes || 0,
@@ -261,17 +267,8 @@ export default function DashboardPage() {
       const dayLabel = d.toLocaleDateString('vi-VN', { weekday: 'short' }); // e.g., "Th 2"
       const dayShort = dayLabel.replace('Thứ ', 'T').replace('Th ', 'T');
 
-      let minutes = 0;
-      if (isPremium) {
-        const item = heatmapData.find(h => h.date === dateStr);
-        minutes = item ? item.totalMinutes : 0;
-      } else {
-        // Fallback mock data for demo
-        const mockVals = daysCount === 7 
-          ? [15, 45, 0, 30, 60, 20, 40] 
-          : [10, 15, 0, 30, 45, 20, 35, 60, 10, 25, 0, 15, 40, 50, 0, 20, 30, 45, 10, 0, 35, 60, 15, 30, 25, 45, 0, 40, 55, 30];
-        minutes = mockVals[i % mockVals.length];
-      }
+      const item = heatmapData.find(h => h.date === dateStr);
+      const minutes = item ? item.totalMinutes : 0;
 
       dataPoints.push({
         date: dateStr,
@@ -295,18 +292,9 @@ export default function DashboardPage() {
       d.setDate(now.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
 
-      let level = 0;
-      let mins = 0;
-      if (isPremium) {
-        const item = heatmapData.find(h => h.date === dateStr);
-        level = item ? item.level : 0;
-        mins = item ? item.totalMinutes : 0;
-      } else {
-        // Simple mock levels
-        const mockLevels = [0, 1, 0, 2, 3, 0, 4, 1, 2, 0, 1, 3, 0, 0, 2, 1, 4, 0, 2, 3, 1, 0, 0, 2, 3, 4, 0, 1, 2, 3];
-        level = mockLevels[i % mockLevels.length];
-        mins = level * 30;
-      }
+      const item = heatmapData.find(h => h.date === dateStr);
+      const level = item ? item.level : 0;
+      const mins = item ? item.totalMinutes : 0;
 
       cells.push({ date: dateStr, level, minutes: mins });
     }

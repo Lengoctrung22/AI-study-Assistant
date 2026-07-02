@@ -76,6 +76,15 @@ async function processDocument(documentId, filePath, userId) {
       status: 'ready',
     });
 
+    // Record study activity
+    try {
+      const { recordActivity } = require('../services/activityService');
+      const studyMins = Math.max(5, Math.min(30, (pageCount || 1) * 3));
+      await recordActivity(userId, 'document_view', studyMins, documentId, { isUpload: true });
+    } catch (actError) {
+      console.error('Failed to log document upload activity:', actError.message);
+    }
+
     console.log(`✅ Document processed: ${documentId}`);
   } catch (error) {
     console.error(`❌ Document processing failed: ${error.message}`);
@@ -109,6 +118,14 @@ exports.getDocument = async (req, res, next) => {
 
     if (!document) {
       return res.status(404).json({ message: 'Không tìm thấy tài liệu' });
+    }
+
+    // Record study activity (view document = 5 mins)
+    try {
+      const { recordActivity } = require('../services/activityService');
+      await recordActivity(req.user._id, 'document_view', 5, document._id);
+    } catch (actError) {
+      console.error('Failed to log document view activity:', actError.message);
     }
 
     res.json({ document });

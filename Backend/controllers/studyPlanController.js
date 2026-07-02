@@ -206,6 +206,9 @@ exports.logActivity = async (req, res, next) => {
 // GET /api/study-plan/streak
 exports.getStreak = async (req, res, next) => {
   try {
+    const { syncActivitiesFromEntities } = require('../services/activityService');
+    await syncActivitiesFromEntities(req.user._id);
+
     // Get last 365 days of activities
     const activities = await StudyActivity.find({
       userId: req.user._id,
@@ -255,6 +258,9 @@ exports.getStreak = async (req, res, next) => {
 // GET /api/study-plan/heatmap
 exports.getHeatmap = async (req, res, next) => {
   try {
+    const { syncActivitiesFromEntities } = require('../services/activityService');
+    await syncActivitiesFromEntities(req.user._id);
+
     const activities = await StudyActivity.find({
       userId: req.user._id,
     })
