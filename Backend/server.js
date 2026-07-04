@@ -16,6 +16,7 @@ const premiumRoutes = require('./routes/premiumRoutes');
 const studyPlanRoutes = require('./routes/studyPlanRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const notebookRoutes = require('./routes/notebookRoutes');
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use('/api/premium', premiumRoutes);
 app.use('/api/study-plan', studyPlanRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/notebooks', notebookRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

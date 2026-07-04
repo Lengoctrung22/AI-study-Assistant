@@ -31,7 +31,12 @@ const chatSessionSchema = new mongoose.Schema({
   documentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Document',
-    required: true,
+    required: false,
+  },
+  notebookId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Notebook',
+    required: false,
   },
   title: {
     type: String,

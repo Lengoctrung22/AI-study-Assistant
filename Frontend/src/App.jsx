@@ -17,6 +17,8 @@ import AIToolsPage from './pages/AIToolsPage';
 import AdminLayout from './components/layout/AdminLayout';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import PricingPage from './pages/PricingPage';
+import NotebookListPage from './pages/NotebookListPage';
+import NotebookPage from './pages/NotebookPage';
 import usePWA from './hooks/usePWA';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import PWAUpdatePrompt from './components/PWAUpdatePrompt';
@@ -50,6 +52,9 @@ function App() {
               <Route path="/study-plan" element={<StudyPlanPage />} />
               <Route path="/ai-tools" element={<AIToolsPage />} />
               <Route path="/pricing" element={<PricingPage />} />
+              {/* Notebook routes */}
+              <Route path="/notebooks" element={<NotebookListPage />} />
+              <Route path="/notebooks/:id" element={<NotebookPage />} />
             </Route>
             {/* Admin layout and routes */}
             <Route element={<AdminLayout />}>

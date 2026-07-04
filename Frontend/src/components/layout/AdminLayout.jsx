@@ -1,6 +1,6 @@
 import { Outlet, Navigate, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { HiOutlineDocumentText, HiOutlineChartBarSquare, HiOutlineArrowRightOnRectangle, HiOutlineUserGroup, HiOutlineCpuChip, HiOutlineCreditCard, HiOutlineClipboardDocumentList, HiOutlineAcademicCap, HiOutlineCurrencyDollar } from 'react-icons/hi2';
+import { HiOutlineDocumentText, HiOutlineChartBarSquare, HiOutlineArrowRightOnRectangle, HiOutlineUserGroup, HiOutlineCpuChip, HiOutlineCreditCard, HiOutlineClipboardDocumentList, HiOutlineAcademicCap, HiOutlineCurrencyDollar, HiOutlineHome } from 'react-icons/hi2';
 
 export default function AdminLayout() {
   const { user, loading, logout } = useAuth();
@@ -45,7 +45,16 @@ export default function AdminLayout() {
         </div>
 
         <nav className="admin-sidebar-nav">
-          <div className="admin-sidebar-section-title">Quản trị hệ thống</div>
+          <div className="admin-sidebar-section-title">Giao diện chính</div>
+          <NavLink
+            to="/"
+            className="admin-nav-link"
+          >
+            <span className="admin-nav-link-icon"><HiOutlineHome /></span>
+            Quay lại Trang chủ
+          </NavLink>
+
+          <div className="admin-sidebar-section-title" style={{ marginTop: '16px' }}>Quản trị hệ thống</div>
           {navItems.map((item) => (
             <NavLink
               key={item.to}
