@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { HiOutlineDocumentText, HiOutlineChatBubbleLeftRight, HiOutlineRectangleStack, HiOutlineClipboardDocumentCheck, HiOutlineHome, HiOutlineArrowRightOnRectangle, HiOutlineChartBarSquare, HiOutlineCalendarDays, HiOutlineSparkles, HiOutlineShieldCheck, HiOutlineBookOpen } from 'react-icons/hi2';
+import { HiOutlineDocumentText, HiOutlineChatBubbleLeftRight, HiOutlineRectangleStack, HiOutlineClipboardDocumentCheck, HiOutlineHome, HiOutlineArrowRightOnRectangle, HiOutlineChartBarSquare, HiOutlineCalendarDays, HiOutlineSparkles, HiOutlineShieldCheck, HiOutlineLockClosed } from 'react-icons/hi2';
 import { PiGraduationCapBold, PiCrownBold } from 'react-icons/pi';
 
 export default function Sidebar() {
@@ -13,7 +13,6 @@ export default function Sidebar() {
   const navItems = [
     { to: '/', icon: <HiOutlineHome />, label: 'Tổng quan' },
     { to: '/documents', icon: <HiOutlineDocumentText />, label: 'Tài liệu' },
-    { to: '/notebooks', icon: <HiOutlineBookOpen />, label: 'Sổ tay AI' },
     { to: '/chat', icon: <HiOutlineChatBubbleLeftRight />, label: 'Chat AI' },
     { to: '/flashcards', icon: <HiOutlineRectangleStack />, label: 'Flashcards' },
     { to: '/quiz', icon: <HiOutlineClipboardDocumentCheck />, label: 'Trắc nghiệm' },
@@ -48,15 +47,15 @@ export default function Sidebar() {
 
         <div className="sidebar-section">
           <div className="sidebar-section-title">
-            <PiCrownBold style={{ color: '#f59e0b', marginRight: 4 }} />
+            <PiCrownBold style={{ color: '#f59e0b' }} />
             Premium
-            {!isPremium && <span className="badge badge-warning" style={{ fontSize: 10, marginLeft: 6, padding: '1px 6px', cursor: 'pointer' }} onClick={() => navigate('/pricing')} title="Nâng cấp">PRO</span>}
+            {!isPremium && <span className="badge badge-warning" style={{ fontSize: 9, marginLeft: 4, padding: '1px 5px', cursor: 'pointer', lineHeight: '1.4' }} onClick={() => navigate('/pricing')} title="Nâng cấp">PRO</span>}
           </div>
           {premiumItems.map((item) => (
             <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''} ${!isPremium ? 'nav-link-locked' : ''}`}>
               <span className="nav-link-icon">{item.icon}</span>
               {item.label}
-              {!isPremium && <span className="nav-lock-icon">🔒</span>}
+              {!isPremium && <span className="nav-lock-icon"><HiOutlineLockClosed size={13} /></span>}
             </NavLink>
           ))}
         </div>
@@ -84,7 +83,7 @@ export default function Sidebar() {
         <div className="sidebar-user-info">
           <div className="name">
             {user?.name}
-            {isPremium && <PiCrownBold style={{ color: '#f59e0b', marginLeft: 4, fontSize: 12 }} />}
+            {isPremium && <PiCrownBold style={{ color: '#f59e0b', marginLeft: 4, fontSize: 11 }} />}
           </div>
           <div
             className="email"
@@ -92,7 +91,7 @@ export default function Sidebar() {
             style={{ cursor: 'pointer' }}
             title="Quản lý gói"
           >
-            {isPremium ? 'Premium ✨' : 'Free plan — Nâng cấp'}
+            {isPremium ? 'Premium plan' : 'Free plan - Nâng cấp'}
           </div>
         </div>
         <button className="btn-ghost" onClick={handleLogout} title="Đăng xuất" style={{ padding: 8, borderRadius: 8 }}>

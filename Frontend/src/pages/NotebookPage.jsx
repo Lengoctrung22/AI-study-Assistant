@@ -6,7 +6,9 @@ import {
   HiOutlineChatBubbleLeftRight, HiOutlineDocumentText, 
   HiOutlinePaperAirplane, HiOutlineArrowLeft, HiOutlineXMark,
   HiOutlineClock, HiOutlineQuestionMarkCircle, HiOutlineSparkles,
-  HiOutlineListBullet, HiOutlineChatBubbleBottomCenterText
+  HiOutlineListBullet, HiOutlineChatBubbleBottomCenterText,
+  HiOutlineKey, HiOutlineMagnifyingGlass, HiOutlineChevronRight,
+  HiOutlineMicrophone
 } from 'react-icons/hi2';
 import toast from 'react-hot-toast';
 import ReactMarkdown from 'react-markdown';
@@ -39,6 +41,9 @@ export default function NotebookPage() {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [chatSessions, setChatSessions] = useState([]);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
   
   const chatEndRef = useRef(null);
 
@@ -221,6 +226,30 @@ export default function NotebookPage() {
     setMessages([]);
   };
 
+  // Voice recognition for notebook chat
+  const startVoiceInput = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error('Trình duyệt không hỗ trợ nhận diện giọng nói');
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+    const rec = new SpeechRecognition();
+    rec.lang = 'vi-VN';
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.onstart = () => { setIsListening(true); toast.success('Đang ghi âm giọng nói...'); };
+    rec.onresult = (e) => { const text = e.results[0][0].transcript; setInputMessage(prev => prev + (prev ? ' ' : '') + text); };
+    rec.onerror = () => { toast.error('Lỗi nhận diện giọng nói'); setIsListening(false); };
+    rec.onend = () => { setIsListening(false); };
+    recognitionRef.current = rec;
+    rec.start();
+  };
+
   if (loading) return <div className="loader"><div className="spinner" /></div>;
   if (!notebook) return null;
 
@@ -294,6 +323,14 @@ export default function NotebookPage() {
             <span className="notebook-subtitle">{notebook.description || 'Sổ tay hỗ trợ nghiên cứu đa nguồn'}</span>
           </div>
         </div>
+        
+        <button 
+          className={`notebook-chat-toggle-btn ${isChatOpen ? 'active' : ''}`}
+          onClick={() => setIsChatOpen(!isChatOpen)}
+        >
+          <HiOutlineChatBubbleLeftRight style={{ fontSize: 18 }} />
+          <span>Trò chuyện</span>
+        </button>
       </div>
 
       {/* Main 3-Panel Content */}
@@ -471,8 +508,8 @@ export default function NotebookPage() {
                         const isMinh = dialog.host === 'Minh';
                         return (
                           <div key={index} className={`podcast-bubble-row ${isMinh ? 'host-minh' : 'host-lan'}`}>
-                            <div className="podcast-avatar">
-                              {isMinh ? '👨‍🏫' : '👩‍🎓'}
+                            <div className={`podcast-avatar-initial ${isMinh ? 'minh-avatar' : 'lan-avatar'}`}>
+                              {isMinh ? 'M' : 'L'}
                             </div>
                             <div className="podcast-bubble">
                               <div className="podcast-speaker-name">{isMinh ? 'Minh (Chuyên gia)' : 'Lan (Host)'}</div>
@@ -524,125 +561,159 @@ export default function NotebookPage() {
             ) : (
               /* Not yet generated state */
               <div className="artifact-empty">
-                <div style={{ fontSize: 40, marginBottom: 16 }}>⚡</div>
+                <HiOutlineSparkles style={{ fontSize: 44, color: 'var(--primary-color)', marginBottom: 16 }} />
                 <h3>Chưa có nội dung tổng hợp</h3>
                 <p style={{ marginBottom: 16 }}>Nhấn nút dưới để AI phân tích và biên soạn nội dung cho phần này.</p>
                 <button 
                   className="btn btn-primary" 
                   onClick={() => handleGenerateArtifact(activeTab)}
                   disabled={!notebook.documents || notebook.documents.length === 0}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
-                  🚀 Tạo ngay
+                  <HiOutlineSparkles /> Tạo ngay
                 </button>
               </div>
             )}
           </div>
-        </div>
-
-        {/* ================= RIGHT PANEL: CHAT AI ================= */}
-        <div className="notebook-panel notebook-panel-right">
-          <div className="panel-header">
-            <h3>Trò chuyện với Sổ tay</h3>
-            {messages.length > 0 && (
-              <button className="btn btn-ghost btn-sm" onClick={handleStartNewChat} style={{ fontSize: 12 }}>
-                Làm mới
-              </button>
-            )}
-          </div>
-
-          {/* Quick suggestions if chat is empty */}
-          {messages.length === 0 && (
-            <div className="chat-welcome-container">
-              <div className="chat-welcome-icon">💬</div>
-              <p style={{ fontSize: 13, textAlign: 'center', color: 'var(--text-secondary)', margin: '12px 0 20px' }}>
-                Hỏi bất kỳ điều gì dựa trên các tài liệu trong Sổ tay này. AI sẽ phân tích và trích xuất câu trả lời kèm nguồn tham chiếu.
-              </p>
-              
-              <div className="chat-suggestions-grid">
-                <button className="chat-suggestion-btn" onClick={() => handleSendMessage(null, 'Tóm tắt các tài liệu chính trong sổ tay này')}>
-                  💡 Tóm tắt các tài liệu
-                </button>
-                <button className="chat-suggestion-btn" onClick={() => handleSendMessage(null, 'Có sự khác biệt hoặc mâu thuẫn nào giữa các tài liệu không?')}>
-                  🔍 Tìm điểm mâu thuẫn
-                </button>
-                <button className="chat-suggestion-btn" onClick={() => handleSendMessage(null, 'Liệt kê các khái niệm cốt lõi nhất được đề cập')}>
-                  🔑 Các khái niệm cốt lõi
-                </button>
-              </div>
-
-              {/* Chat Sessions list inside Chat tab */}
-              {chatSessions.length > 0 && (
-                <div style={{ marginTop: 24, borderTop: '1px solid var(--border-color)', paddingTop: 16, width: '100%' }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <HiOutlineClock /> Lịch sử trò chuyện gần đây
-                  </div>
-                  <div className="chat-sessions-list" style={{ maxHeight: 120, overflowY: 'auto' }}>
-                    {chatSessions.slice(0, 3).map((session) => (
-                      <div 
-                        key={session._id} 
-                        className="chat-session-history-item" 
-                        onClick={() => handleLoadSession(session)}
-                        style={{ fontSize: 12, padding: '6px 8px', borderRadius: 6, cursor: 'pointer', background: 'var(--bg-tertiary)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                      >
-                        {session.title}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Messages Flow */}
-          {messages.length > 0 && (
-            <div className="chat-messages-container">
-              {messages.map((msg, index) => (
-                <div className={`chat-message ${msg.role === 'user' ? 'user' : 'assistant'}`} key={index}>
-                  <div className="chat-message-bubble">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
-                    
-                    {/* Citations list for assistant messages */}
-                    {msg.citations && msg.citations.length > 0 && (
-                      <div className="chat-citations-section">
-                        <div className="citations-header">Trích dẫn tham chiếu ({msg.citations.length}):</div>
-                        <div className="citations-grid">
-                          {msg.citations.map((cite, ci) => (
-                            <div className="citation-chip" key={ci} title={cite.chunkText}>
-                              <span className="cite-doc-title">{cite.documentTitle}</span>
-                              {cite.pageNumber && <span className="cite-page">Trang {cite.pageNumber}</span>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
-          )}
-
-          {/* Chat Input */}
-          <form className="chat-input-row" onSubmit={(e) => handleSendMessage(e)}>
-            <input 
-              type="text" 
-              className="input chat-input-field" 
-              placeholder="Hỏi AI về các tài liệu..." 
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              disabled={sendingMessage || !notebook.documents || notebook.documents.length === 0}
-            />
-            <button 
-              type="submit" 
-              className="btn btn-primary chat-submit-btn" 
-              disabled={sendingMessage || !inputMessage.trim() || !notebook.documents || notebook.documents.length === 0}
-            >
-              <HiOutlinePaperAirplane style={{ transform: 'rotate(-45deg)' }} />
-            </button>
-          </form>
         </div>
 
       </div>
+
+      {/* ================= FULL-SCREEN CHAT OVERLAY ================= */}
+      {isChatOpen && (
+        <div className="notebook-chat-overlay">
+          {/* Close / Header Bar */}
+          <div className="notebook-chat-overlay-header">
+            <div className="notebook-chat-overlay-title-group">
+              <HiOutlineChatBubbleLeftRight style={{ fontSize: 20, color: 'var(--accent)' }} />
+              <span>Trò chuyện với Sổ tay</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {messages.length > 0 && (
+                <button className="notebook-chat-action-btn" onClick={handleStartNewChat}>
+                  <HiOutlinePlus style={{ fontSize: 14 }} /> Cuộc trò chuyện mới
+                </button>
+              )}
+              <button className="notebook-chat-close-btn" onClick={() => setIsChatOpen(false)}>
+                <HiOutlineXMark style={{ fontSize: 20 }} />
+              </button>
+            </div>
+          </div>
+
+          {/* Chat Content Area */}
+          <div className="notebook-chat-overlay-body">
+            {messages.length === 0 ? (
+              <div className="notebook-chat-empty-state">
+                <div className="notebook-chat-empty-icon">
+                  <HiOutlineChatBubbleBottomCenterText />
+                </div>
+                <h2 className="notebook-chat-empty-title">Trò chuyện học tập</h2>
+                <p className="notebook-chat-empty-desc">
+                  Hỏi đáp chi tiết về tài liệu học tập của bạn. Đặt câu hỏi và gia sư AI sẽ hỗ trợ bạn.
+                </p>
+                
+                <div className="notebook-chat-suggestions">
+                  <button className="notebook-chat-suggest-chip" onClick={() => handleSendMessage(null, 'Tóm tắt các tài liệu chính trong sổ tay này')}>
+                    <HiOutlineDocumentText className="suggest-chip-icon" style={{ color: '#f59e0b' }} />
+                    <span>Tóm tắt các tài liệu</span>
+                  </button>
+                  <button className="notebook-chat-suggest-chip" onClick={() => handleSendMessage(null, 'Có sự khác biệt hoặc mâu thuẫn nào giữa các tài liệu không?')}>
+                    <HiOutlineMagnifyingGlass className="suggest-chip-icon" style={{ color: '#ef4444' }} />
+                    <span>Tìm điểm mâu thuẫn</span>
+                  </button>
+                  <button className="notebook-chat-suggest-chip" onClick={() => handleSendMessage(null, 'Liệt kê các khái niệm cốt lõi nhất được đề cập')}>
+                    <HiOutlineKey className="suggest-chip-icon" style={{ color: '#10b981' }} />
+                    <span>Các khái niệm cốt lõi</span>
+                  </button>
+                </div>
+
+                {/* Recent chat sessions */}
+                {chatSessions.length > 0 && (
+                  <div className="notebook-chat-history-section">
+                    <div className="notebook-chat-history-label">
+                      <HiOutlineClock /> Lịch sử trò chuyện gần đây
+                    </div>
+                    <div className="notebook-chat-history-list">
+                      {chatSessions.slice(0, 5).map((session) => (
+                        <button 
+                          key={session._id} 
+                          className="notebook-chat-history-item" 
+                          onClick={() => handleLoadSession(session)}
+                        >
+                          <HiOutlineChatBubbleLeftRight style={{ fontSize: 14, flexShrink: 0, opacity: 0.5 }} />
+                          <span>{session.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="notebook-chat-messages-flow">
+                {messages.map((msg, index) => (
+                  <div className={`nchat-msg ${msg.role === 'user' ? 'nchat-user' : 'nchat-ai'}`} key={index}>
+                    <div className="nchat-msg-bubble">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      {msg.citations && msg.citations.length > 0 && (
+                        <div className="nchat-citations">
+                          <div className="nchat-citations-label">Nguồn trích dẫn ({msg.citations.length}):</div>
+                          <div className="nchat-citations-chips">
+                            {msg.citations.map((cite, ci) => (
+                              <div className="nchat-citation-chip" key={ci} title={cite.chunkText}>
+                                <span className="nchat-cite-title">{cite.documentTitle}</span>
+                                {cite.pageNumber && <span className="nchat-cite-page">Trang {cite.pageNumber}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {sendingMessage && (
+                  <div className="nchat-msg nchat-ai">
+                    <div className="nchat-msg-bubble">
+                      <div className="nchat-typing-indicator">
+                        <span></span><span></span><span></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Input Bar */}
+          <div className="notebook-chat-input-bar">
+            <form className="notebook-chat-input-form" onSubmit={(e) => handleSendMessage(e)}>
+              <button 
+                type="button" 
+                className={`notebook-chat-voice-btn ${isListening ? 'listening' : ''}`}
+                onClick={startVoiceInput}
+                title="Nhập giọng nói"
+              >
+                <HiOutlineMicrophone />
+              </button>
+              <input 
+                type="text" 
+                className="notebook-chat-input" 
+                placeholder="Hỏi về nội dung tài liệu..." 
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                disabled={sendingMessage || !notebook.documents || notebook.documents.length === 0}
+              />
+              <button 
+                type="submit" 
+                className="notebook-chat-send-btn" 
+                disabled={sendingMessage || !inputMessage.trim() || !notebook.documents || notebook.documents.length === 0}
+              >
+                <HiOutlinePaperAirplane />
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ================= ADD DOCUMENTS MODAL ================= */}
       {isAddDocOpen && (
