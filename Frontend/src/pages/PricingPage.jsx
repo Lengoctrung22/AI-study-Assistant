@@ -182,15 +182,53 @@ export default function PricingPage() {
       return;
     }
 
+    const cleanedCard = cardNumber.replace(/\s/g, '');
+    
+    // Client-side validation of the real card info first
+    if (!/^\d{13,19}$/.test(cleanedCard)) {
+      toast.error('Số thẻ không hợp lệ (phải từ 13 đến 19 chữ số)');
+      return;
+    }
+    if (!cardName || cardName.trim().length < 2) {
+      toast.error('Tên chủ thẻ không hợp lệ');
+      return;
+    }
+    if (!/^\d{2}\/\d{2}$/.test(expiry)) {
+      toast.error('Ngày hết hạn không hợp lệ (MM/YY)');
+      return;
+    } else {
+      const [mm, yy] = expiry.split('/').map(Number);
+      if (mm < 1 || mm > 12) {
+        toast.error('Tháng hết hạn không hợp lệ');
+        return;
+      }
+      const now = new Date();
+      const expDate = new Date(2000 + yy, mm);
+      if (expDate < now) {
+        toast.error('Thẻ đã hết hạn');
+        return;
+      }
+    }
+    if (!/^\d{3,4}$/.test(cvv)) {
+      toast.error('CVV không hợp lệ (phải gồm 3 hoặc 4 chữ số)');
+      return;
+    }
+
     setCheckoutStep('processing');
+
+    // Safe simulated/mock details to protect real user credentials and follow PCI DSS
+    let mockCard = '4242424242424242'; // default mock visa
+    if (/^5[1-5]/.test(cleanedCard)) mockCard = '5555555555555555'; // mock mastercard
+    else if (/^3[47]/.test(cleanedCard)) mockCard = '378282246310005'; // mock amex
+    else if (/^9704/.test(cleanedCard)) mockCard = '9704000000000000'; // mock napas
 
     try {
       const res = await api.post('/payments/checkout', {
         plan: selectedPlan.code,
-        cardNumber: cardNumber.replace(/\s/g, ''),
-        cardName,
-        expiry,
-        cvv,
+        cardNumber: mockCard,
+        cardName: cardName.trim(),
+        expiry: expiry,
+        cvv: '000', // CVV is masked/mocked to prevent transmission
         method: 'card',
       });
 

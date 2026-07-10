@@ -6,10 +6,7 @@ const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,11 +15,9 @@ export function AuthProvider({ children }) {
       api.get('/auth/me')
         .then((res) => {
           setUser(res.data.user);
-          localStorage.setItem('user', JSON.stringify(res.data.user));
         })
         .catch(() => {
           localStorage.removeItem('token');
-          localStorage.removeItem('user');
           setUser(null);
         })
         .finally(() => setLoading(false));
@@ -34,7 +29,6 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
     localStorage.setItem('token', res.data.token);
-    localStorage.setItem('user', JSON.stringify(res.data.user));
     setUser(res.data.user);
     return res.data;
   };
@@ -46,13 +40,11 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
     setUser(null);
   };
 
   const updateUser = (userData) => {
     const updated = { ...user, ...userData };
-    localStorage.setItem('user', JSON.stringify(updated));
     setUser(updated);
   };
 
