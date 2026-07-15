@@ -89,8 +89,8 @@ exports.checkout = async (req, res, next) => {
     }
 
     // Calculate premium expiry
-    const now = new Date();
-    const premiumExpiresAt = new Date(now.setMonth(now.getMonth() + planObj.durationMonths));
+    const premiumExpiresAt = new Date();
+    premiumExpiresAt.setMonth(premiumExpiresAt.getMonth() + planObj.durationMonths);
 
     // Create successful payment record
     const payment = await Payment.create({
@@ -263,8 +263,8 @@ exports.checkQRStatus = async (req, res, next) => {
         const planObj = await PricingPlan.findOne({ code: payment.plan });
         const durationMonths = planObj ? planObj.durationMonths : 1;
 
-        const now = new Date();
-        const premiumExpiresAt = new Date(now.setMonth(now.getMonth() + durationMonths));
+        const premiumExpiresAt = new Date();
+        premiumExpiresAt.setMonth(premiumExpiresAt.getMonth() + durationMonths);
 
         payment.status = 'completed';
         await payment.save();

@@ -27,8 +27,8 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(name, email, password);
-      toast.success('Đăng ký thành công! Vui lòng đăng nhập.');
-      navigate('/login', { state: { email } });
+      toast.success('Đăng ký thành công! Chào mừng bạn.');
+      navigate('/');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Đăng ký thất bại');
     } finally {

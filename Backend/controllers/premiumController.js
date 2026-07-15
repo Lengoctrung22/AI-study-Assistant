@@ -191,6 +191,7 @@ exports.getWeakAreas = async (req, res, next) => {
     // Aggregate results by topic
     const topicStats = {};
     quizzes.forEach((quiz) => {
+      if (!quiz.result?.answers) return; // Skip quizzes with missing result data
       quiz.questions.forEach((q, idx) => {
         const topic = q.topic || 'Chung';
         if (!topicStats[topic]) {
@@ -199,6 +200,7 @@ exports.getWeakAreas = async (req, res, next) => {
         topicStats[topic].total++;
 
         const userAnswer = quiz.result.answers[idx];
+        if (userAnswer === undefined || userAnswer === null) return; // Skip missing answers
         // For MCQ
         if (q.type === 'mcq' || !q.type) {
           if (userAnswer !== q.correctAnswer) {

@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const activityEntrySchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['document_view', 'flashcard_review', 'quiz_complete', 'chat_message', 'study_plan'],
+    enum: ['document_view', 'flashcard_review', 'quiz_complete', 'chat_message', 'study_plan', 'notebook_generation'],
     required: true,
   },
   duration: {

@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { HiOutlineDocumentText, HiOutlineChatBubbleLeftRight, HiOutlineRectangleStack, HiOutlineClipboardDocumentCheck, HiOutlineHome, HiOutlineArrowRightOnRectangle, HiOutlineChartBarSquare, HiOutlineCalendarDays, HiOutlineSparkles, HiOutlineShieldCheck, HiOutlineLockClosed } from 'react-icons/hi2';
+import { HiOutlineDocumentText, HiOutlineChatBubbleLeftRight, HiOutlineRectangleStack, HiOutlineClipboardDocumentCheck, HiOutlineHome, HiOutlineArrowRightOnRectangle, HiOutlineChartBarSquare, HiOutlineCalendarDays, HiOutlineSparkles, HiOutlineShieldCheck, HiOutlineLockClosed, HiOutlineBookOpen } from 'react-icons/hi2';
 import { PiGraduationCapBold, PiCrownBold } from 'react-icons/pi';
 
 export default function Sidebar() {
@@ -13,6 +13,7 @@ export default function Sidebar() {
   const navItems = [
     { to: '/', icon: <HiOutlineHome />, label: 'Tổng quan' },
     { to: '/documents', icon: <HiOutlineDocumentText />, label: 'Tài liệu' },
+    { to: '/notebooks', icon: <HiOutlineBookOpen />, label: 'Sổ tay nghiên cứu' },
     { to: '/chat', icon: <HiOutlineChatBubbleLeftRight />, label: 'Chat AI' },
     { to: '/flashcards', icon: <HiOutlineRectangleStack />, label: 'Flashcards' },
     { to: '/quiz', icon: <HiOutlineClipboardDocumentCheck />, label: 'Trắc nghiệm' },

@@ -4,7 +4,7 @@ const { getTodayString } = require('./studyPlanService');
 /**
  * Record a user study activity
  * @param {string|ObjectId} userId
- * @param {'document_view'|'flashcard_review'|'quiz_complete'|'chat_message'|'study_plan'} type
+ * @param {'document_view'|'flashcard_review'|'quiz_complete'|'chat_message'|'study_plan'|'notebook_generation'} type
  * @param {number} duration - duration in minutes
  * @param {string|ObjectId|null} documentId
  * @param {object} metadata
@@ -41,6 +41,10 @@ const recordActivity = async (userId, type, duration = 0, documentId = null, met
     activity.totalMinutes = activity.activities.reduce((sum, act) => sum + (act.duration || 0), 0);
 
     await activity.save();
+
+    // Invalidate sync cache for this user since new data was recorded
+    _syncCache.delete(String(userId));
+
     return activity;
   } catch (error) {
     console.error('Error in recordActivity:', error);
@@ -48,11 +52,30 @@ const recordActivity = async (userId, type, duration = 0, documentId = null, met
 };
 
 /**
+ * In-memory cache to throttle syncActivitiesFromEntities.
+ * Key: userId (string), Value: timestamp of last sync (ms).
+ * The sync is expensive (4 full collection scans), so we only run it
+ * at most once every SYNC_COOLDOWN_MS per user.
+ */
+const _syncCache = new Map();
+const SYNC_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
+
+/**
  * Synchronize study activities from existing database entities (Documents, Flashcards, Quizzes, Chats)
  * @param {string|ObjectId} userId
+ * @param {boolean} force - if true, bypass the cooldown cache
  */
-const syncActivitiesFromEntities = async (userId) => {
+const syncActivitiesFromEntities = async (userId, force = false) => {
   try {
+    const userKey = String(userId);
+    const lastSync = _syncCache.get(userKey);
+    const now = Date.now();
+
+    // Skip sync if we ran it recently for this user (unless forced)
+    if (!force && lastSync && (now - lastSync) < SYNC_COOLDOWN_MS) {
+      return;
+    }
+
     const Document = require('../models/Document');
     const FlashcardSet = require('../models/FlashcardSet');
     const Quiz = require('../models/Quiz');
@@ -137,6 +160,9 @@ const syncActivitiesFromEntities = async (userId) => {
         { upsert: true, new: true }
       );
     }
+
+    // Update cache timestamp after successful sync
+    _syncCache.set(userKey, now);
   } catch (error) {
     console.error('Error in syncActivitiesFromEntities:', error);
   }
@@ -146,3 +172,4 @@ module.exports = {
   recordActivity,
   syncActivitiesFromEntities,
 };
+

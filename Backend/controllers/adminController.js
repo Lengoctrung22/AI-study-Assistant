@@ -1,7 +1,6 @@
 const User = require('../models/User');
 const Document = require('../models/Document');
 const mongoose = require('mongoose');
-const { execSync } = require('child_process');
 const fs = require('fs');
 const { deleteDocumentChunks } = require('../services/embeddingService');
 
@@ -296,11 +295,19 @@ exports.getHealth = async (req, res, next) => {
     let diskFreeBytes = 0;
     let diskTotalBytes = 0;
     try {
+      // Async wrapper for exec to avoid blocking the event loop
+      const execAsync = (cmd) => new Promise((resolve, reject) => {
+        const { exec } = require('child_process');
+        exec(cmd, { encoding: 'utf-8', timeout: 5000 }, (error, stdout) => {
+          if (error) reject(error);
+          else resolve(stdout);
+        });
+      });
+
       // Works on Windows (where the app is hosted)
-      const output = execSync(
-        'wmic logicaldisk where "DeviceID=\'E:\'" get FreeSpace,Size /format:csv',
-        { encoding: 'utf-8', timeout: 5000 }
-      ).trim();
+      const output = (await execAsync(
+        'wmic logicaldisk where "DeviceID=\'E:\'" get FreeSpace,Size /format:csv'
+      )).trim();
       // Parse CSV: Node,FreeSpace,Size
       const lines = output.split('\n').filter(l => l.trim());
       const lastLine = lines[lines.length - 1].trim();
@@ -312,8 +319,14 @@ exports.getHealth = async (req, res, next) => {
     } catch (diskErr) {
       // Fallback: try cross-platform df approach or just report unknown
       try {
-        const output = execSync('df -B1 / | tail -1', { encoding: 'utf-8', timeout: 5000 }).trim();
-        const parts = output.split(/\s+/);
+        const { exec } = require('child_process');
+        const dfOutput = await new Promise((resolve, reject) => {
+          exec('df -B1 / | tail -1', { encoding: 'utf-8', timeout: 5000 }, (error, stdout) => {
+            if (error) reject(error);
+            else resolve(stdout);
+          });
+        });
+        const parts = dfOutput.trim().split(/\s+/);
         diskTotalBytes = parseInt(parts[1]) || 0;
         diskFreeBytes = parseInt(parts[3]) || 0;
       } catch (_) {

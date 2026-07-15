@@ -49,7 +49,6 @@ const cleanText = (text) => {
   return text
     .replace(/\r\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
-    .replace(/\s{2,}/g, ' ')
     .replace(/[^\S\n]+/g, ' ')
     .trim();
 };

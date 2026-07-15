@@ -43,6 +43,7 @@ const calculateStreak = (activities) => {
 
   let streak = 0;
   let checkDate = new Date(today);
+  let retriedToday = false;
 
   for (let i = 0; i < sorted.length; i++) {
     const dateStr = checkDate.toISOString().split('T')[0];
@@ -50,8 +51,9 @@ const calculateStreak = (activities) => {
     if (sorted.find((a) => a.date === dateStr)) {
       streak++;
       checkDate.setDate(checkDate.getDate() - 1);
-    } else if (i === 0 && dateStr === today) {
-      // Today hasn't been logged yet, check yesterday
+    } else if (i === 0 && dateStr === today && !retriedToday) {
+      // Today hasn't been logged yet, check yesterday (only once)
+      retriedToday = true;
       checkDate.setDate(checkDate.getDate() - 1);
       i--; // Retry with yesterday
     } else {

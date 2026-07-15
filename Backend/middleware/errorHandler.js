@@ -15,7 +15,7 @@ const errorHandler = (err, req, res, next) => {
     return res.status(400).json({ message: 'ID không hợp lệ' });
   }
 
-  if (err.message === 'Chỉ hỗ trợ file PDF') {
+  if (err.message?.includes('Chỉ hỗ trợ file')) {
     return res.status(400).json({ message: err.message });
   }
 
