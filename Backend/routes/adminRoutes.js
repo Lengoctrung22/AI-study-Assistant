@@ -19,7 +19,8 @@ const {
   getAdminPlans,
   createPlan,
   updatePlan,
-  deletePlan
+  deletePlan,
+  updateApiConfig
 } = require('../controllers/adminController');
 
 // All routes require auth + admin role
@@ -32,6 +33,8 @@ router.get('/users', getUsers);
 router.get('/health', getHealth);
 router.get('/payments', getPayments);
 router.get('/logs', getLlmLogs);
+
+router.put('/api-config', updateApiConfig);
 
 router.get('/plans', getAdminPlans);
 router.post('/plans', createPlan);

@@ -67,7 +67,7 @@ export default function ChatPage() {
   // Fetch sessions for selected single doc
   useEffect(() => {
     if (selectedDoc && !multiDocMode) {
-      api.get(`/chat/sessions?documentId=${selectedDoc}`).then((r) => setSessions(r.data.sessions || []));
+      api.get('/chat/sessions', { params: { documentId: selectedDoc } }).then((r) => setSessions(r.data.sessions || []));
       setCurrentSession(null);
       setMessages([]);
       setSuggestions([]);
@@ -78,7 +78,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!isPremium) return;
     if (searchQuery.trim().length >= 2) {
-      api.get(`/chat/search?q=${searchQuery}`)
+      api.get('/chat/search', { params: { q: searchQuery } })
         .then(r => setSearchResults(r.data.results || []))
         .catch(console.error);
     } else {
@@ -137,7 +137,7 @@ export default function ChatPage() {
         
         // Refresh sessions list if it is a new session
         if (!currentSession) {
-          api.get(`/chat/sessions?documentId=${selectedDoc}`).then((r) => setSessions(r.data.sessions || []));
+          api.get('/chat/sessions', { params: { documentId: selectedDoc } }).then((r) => setSessions(r.data.sessions || []));
         }
       }
     } catch (err) {

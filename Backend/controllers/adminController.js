@@ -651,6 +651,33 @@ exports.updatePlan = async (req, res, next) => {
   }
 };
 
+// PUT /api/admin/api-config
+exports.updateApiConfig = async (req, res, next) => {
+  try {
+    const { defaultModel, temperature, maxTokens, safetyLevel, geminiApiKey } = req.body;
+    
+    // In a real application, update process.env or store in a SystemConfig model
+    if (geminiApiKey) {
+      process.env.GEMINI_API_KEY = geminiApiKey;
+    }
+    if (defaultModel) {
+      process.env.GEMINI_DEFAULT_MODEL = defaultModel;
+    }
+
+    res.json({ 
+      message: 'Cấu hình API & LLM đã được cập nhật thành công',
+      config: {
+        defaultModel: defaultModel || process.env.GEMINI_DEFAULT_MODEL || 'gemini-1.5-flash',
+        temperature: temperature !== undefined ? temperature : 0.7,
+        maxTokens: maxTokens || 2048,
+        safetyLevel: safetyLevel || 'medium'
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // DELETE /api/admin/plans/:id
 exports.deletePlan = async (req, res, next) => {
   try {
@@ -664,3 +691,4 @@ exports.deletePlan = async (req, res, next) => {
     next(err);
   }
 };
+

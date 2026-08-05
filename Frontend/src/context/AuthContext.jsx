@@ -43,6 +43,14 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
+    // Security: Clear cached API responses to prevent data leakage on shared devices
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => {
+          if (name.includes('api')) caches.delete(name);
+        });
+      });
+    }
   };
 
   const updateUser = (userData) => {

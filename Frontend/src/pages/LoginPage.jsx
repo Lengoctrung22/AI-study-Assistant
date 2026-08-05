@@ -20,21 +20,52 @@ export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  // Security: Login attempt throttle (brute-force protection)
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState(null);
+
   useEffect(() => {
     if (location.state?.email) {
       setEmail(location.state.email);
     }
   }, [location.state]);
 
+  // Auto-clear lockout after timeout
+  useEffect(() => {
+    if (lockoutUntil) {
+      const timer = setTimeout(() => {
+        setLockoutUntil(null);
+        setFailedAttempts(0);
+      }, lockoutUntil - Date.now());
+      return () => clearTimeout(timer);
+    }
+  }, [lockoutUntil]);
+
+  const isLockedOut = lockoutUntil && Date.now() < lockoutUntil;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isLockedOut) {
+      const seconds = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      toast.error(`Quá nhiều lần thử. Vui lòng đợi ${seconds} giây.`);
+      return;
+    }
     setLoading(true);
     try {
       await login(email, password);
+      setFailedAttempts(0);
       toast.success('Đăng nhập thành công!');
       navigate('/');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Đăng nhập thất bại');
+      const newAttempts = failedAttempts + 1;
+      setFailedAttempts(newAttempts);
+      if (newAttempts >= 5) {
+        const lockDuration = 30000; // 30 seconds
+        setLockoutUntil(Date.now() + lockDuration);
+        toast.error('Quá nhiều lần đăng nhập thất bại. Đã tạm khóa 30 giây.');
+      } else {
+        toast.error(err.response?.data?.message || 'Email hoặc mật khẩu không đúng');
+      }
     } finally {
       setLoading(false);
     }
@@ -148,8 +179,8 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <button className="auth-submit-btn" type="submit" disabled={loading}>
-              <span>{loading ? 'Đang đăng nhập...' : 'Đăng nhập'}</span>
+            <button className="auth-submit-btn" type="submit" disabled={loading || isLockedOut}>
+              <span>{loading ? 'Đang đăng nhập...' : isLockedOut ? 'Tạm khóa...' : 'Đăng nhập'}</span>
               <span className="btn-arrow-wrapper">
                 <PiArrowRight />
               </span>

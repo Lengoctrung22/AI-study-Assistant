@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { 
   HiOutlineUserGroup, 
   HiOutlineDocumentText, 
@@ -17,6 +18,9 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 
 export default function AdminDashboardPage() {
+  const { user } = useAuth();
+  // Double guard: prevent rendering if not admin (backup for AdminLayout guard)
+  if (!user || user.role !== 'admin') return null;
   const location = useLocation();
   
   // Determine active view based on URL path
@@ -149,7 +153,7 @@ export default function AdminDashboardPage() {
   const fetchUsers = async () => {
     try {
       setUsersLoading(true);
-      const res = await api.get(`/admin/users?page=${usersPage}&limit=10`);
+      const res = await api.get('/admin/users', { params: { page: usersPage, limit: 10 } });
       setUsers(res.data.users);
       setUsersTotalPages(res.data.pagination.pages);
       setTotalUsersCount(res.data.pagination.total);
@@ -164,7 +168,7 @@ export default function AdminDashboardPage() {
   const fetchRecentDocs = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`/admin/recent-documents?page=${page}&status=${statusFilter}&limit=10`);
+      const res = await api.get('/admin/recent-documents', { params: { page, status: statusFilter, limit: 10 } });
       setRecentDocs(res.data.documents);
       setTotalPages(res.data.pagination.pages);
       setTotalDocsCount(res.data.pagination.total);
@@ -179,7 +183,7 @@ export default function AdminDashboardPage() {
   const fetchPayments = async () => {
     try {
       setPaymentsLoading(true);
-      const res = await api.get(`/admin/payments?page=${paymentsPage}&limit=10`);
+      const res = await api.get('/admin/payments', { params: { page: paymentsPage, limit: 10 } });
       setPayments(res.data.payments);
       setPaymentsTotalPages(res.data.pagination.pages);
       setTotalPaymentsCount(res.data.pagination.total);
@@ -194,7 +198,7 @@ export default function AdminDashboardPage() {
   const fetchLlmLogs = async () => {
     try {
       setLogsLoading(true);
-      const res = await api.get(`/admin/logs?page=${logsPage}&limit=10`);
+      const res = await api.get('/admin/logs', { params: { page: logsPage, limit: 10 } });
       setLlmLogs(res.data.logs);
       setLogsTotalPages(res.data.pagination.pages);
       setTotalLogsCount(res.data.pagination.total);
@@ -374,9 +378,21 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleSaveApiConfig = (e) => {
+  const handleSaveApiConfig = async (e) => {
     e.preventDefault();
-    toast.success('Cấu hình API & LLM đã được cập nhật thành công!');
+    try {
+      await api.put('/admin/api-config', {
+        defaultModel: apiConfig.defaultModel,
+        temperature: apiConfig.temperature,
+        maxTokens: apiConfig.maxTokens,
+        safetyLevel: apiConfig.safetyLevel,
+        // Note: API key should only be sent if changed from the masked value
+        ...(apiConfig.geminiApiKey !== '••••••••••••••••••••••••••••••••••••' && { geminiApiKey: apiConfig.geminiApiKey })
+      });
+      toast.success('Cấu hình API & LLM đã được cập nhật thành công!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không thể lưu cấu hình. Kiểm tra lại API endpoint.');
+    }
   };
 
   // Filters

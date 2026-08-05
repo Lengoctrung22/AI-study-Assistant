@@ -62,13 +62,16 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^\/api\/.*/i,
+            // Only cache non-sensitive, public-facing API responses (e.g. pricing plans)
+            // SECURITY: Exclude auth, admin, chat, documents, payments, notebooks
+            // to prevent sensitive data from persisting in browser cache after logout
+            urlPattern: /^\/api\/payments\/plans$/i,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'api-cache',
+              cacheName: 'api-public-cache',
               expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 // 1 hour max for public data
               },
               networkTimeoutSeconds: 5
             }
