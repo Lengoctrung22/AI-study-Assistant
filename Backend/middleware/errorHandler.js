@@ -23,8 +23,12 @@ const errorHandler = (err, req, res, next) => {
     return res.status(400).json({ message: 'File quá lớn (tối đa 10MB)' });
   }
 
+  const isDev = process.env.NODE_ENV !== 'production';
+
   res.status(err.statusCode || 500).json({
-    message: err.message || 'Lỗi server nội bộ',
+    message: err.statusCode && err.statusCode < 500 
+      ? err.message 
+      : (isDev ? (err.message || 'Lỗi server nội bộ') : 'Đã có lỗi hệ thống xảy ra. Vui lòng thử lại sau.'),
   });
 };
 

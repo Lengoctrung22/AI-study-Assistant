@@ -275,7 +275,12 @@ exports.getHealth = async (req, res, next) => {
       try {
         const geminiStart = Date.now();
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}&pageSize=1`
+          `https://generativelanguage.googleapis.com/v1beta/models?pageSize=1`,
+          {
+            headers: {
+              'x-goog-api-key': process.env.GEMINI_API_KEY
+            }
+          }
         );
         const elapsed = Date.now() - geminiStart;
         if (response.ok) {
@@ -387,7 +392,9 @@ exports.createUser = async (req, res, next) => {
       role: role || 'user',
       plan: plan || 'free'
     });
-    res.status(201).json({ message: 'Đã tạo người dùng thành công', user });
+    const userResponse = user.toObject();
+    delete userResponse.password;
+    res.status(201).json({ message: 'Đã tạo người dùng thành công', user: userResponse });
   } catch (err) {
     next(err);
   }
@@ -401,7 +408,7 @@ exports.updateUserRole = async (req, res, next) => {
     if (!['user', 'admin'].includes(role)) {
       return res.status(400).json({ message: 'Vai trò không hợp lệ' });
     }
-    const user = await User.findByIdAndUpdate(userId, { role }, { new: true });
+    const user = await User.findByIdAndUpdate(userId, { role }, { new: true }).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }
@@ -419,7 +426,7 @@ exports.updateUserPlan = async (req, res, next) => {
     if (!['free', 'premium'].includes(plan)) {
       return res.status(400).json({ message: 'Gói dịch vụ không hợp lệ' });
     }
-    const user = await User.findByIdAndUpdate(userId, { plan }, { new: true });
+    const user = await User.findByIdAndUpdate(userId, { plan }, { new: true }).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }
@@ -439,7 +446,7 @@ exports.toggleUserLock = async (req, res, next) => {
       return res.status(400).json({ message: 'Bạn không thể tự khóa tài khoản của chính mình' });
     }
 
-    const user = await User.findByIdAndUpdate(userId, { isLocked }, { new: true });
+    const user = await User.findByIdAndUpdate(userId, { isLocked }, { new: true }).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }
@@ -457,6 +464,12 @@ exports.toggleUserLock = async (req, res, next) => {
 exports.deleteUser = async (req, res, next) => {
   try {
     const { userId } = req.params;
+
+    // Prevent admin from deleting themselves
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json({ message: 'Bạn không thể xóa tài khoản của chính mình' });
+    }
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'Không tìm thấy người dùng' });
@@ -654,18 +667,16 @@ exports.updatePlan = async (req, res, next) => {
 // PUT /api/admin/api-config
 exports.updateApiConfig = async (req, res, next) => {
   try {
-    const { defaultModel, temperature, maxTokens, safetyLevel, geminiApiKey } = req.body;
+    const { defaultModel, temperature, maxTokens, safetyLevel } = req.body;
     
-    // In a real application, update process.env or store in a SystemConfig model
-    if (geminiApiKey) {
-      process.env.GEMINI_API_KEY = geminiApiKey;
-    }
+    // Security: Do NOT allow API key changes via HTTP requests.
+    // API keys must be managed via environment variables on the server.
     if (defaultModel) {
       process.env.GEMINI_DEFAULT_MODEL = defaultModel;
     }
 
     res.json({ 
-      message: 'Cấu hình API & LLM đã được cập nhật thành công',
+      message: 'Cấu hình LLM đã được cập nhật thành công',
       config: {
         defaultModel: defaultModel || process.env.GEMINI_DEFAULT_MODEL || 'gemini-1.5-flash',
         temperature: temperature !== undefined ? temperature : 0.7,

@@ -98,25 +98,3 @@ exports.getMe = async (req, res, next) => {
     next(error);
   }
 };
-
-// POST /api/auth/toggle-plan (Developer/Testing tool)
-exports.togglePlan = async (req, res, next) => {
-  try {
-    const newPlan = req.user.plan === 'premium' ? 'free' : 'premium';
-    req.user.plan = newPlan;
-    await req.user.save();
-
-    res.json({
-      message: `Đã chuyển sang gói ${newPlan === 'premium' ? 'Premium' : 'Miễn phí'}!`,
-      user: {
-        id: req.user._id,
-        name: req.user.name,
-        email: req.user.email,
-        plan: req.user.plan,
-        role: req.user.role,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};

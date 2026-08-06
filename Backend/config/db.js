@@ -46,21 +46,19 @@ const seedPricingPlans = async () => {
 
 const seedAdminUser = async () => {
   try {
-    const adminExists = await User.findOne({ email: 'admin@gmail.com' });
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@gmail.com';
+    const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || '123123';
+    
+    const adminExists = await User.findOne({ role: 'admin' });
     if (!adminExists) {
       await User.create({
         name: 'Quản trị viên',
-        email: 'admin@gmail.com',
-        password: '123123',
+        email: adminEmail,
+        password: adminPassword,
         role: 'admin',
         plan: 'free'
       });
-      console.log('✅ Admin user admin@gmail.com seeded successfully.');
-    } else {
-      adminExists.password = '123123';
-      adminExists.role = 'admin';
-      await adminExists.save();
-      console.log('✅ Admin user admin@gmail.com updated with password 123123 and role admin.');
+      console.log(`✅ Default admin account (${adminEmail}) seeded successfully.`);
     }
   } catch (err) {
     console.error('❌ Failed to seed admin user:', err.message);

@@ -289,9 +289,12 @@ exports.searchChatHistory = async (req, res, next) => {
       return res.status(400).json({ message: 'Từ khóa tìm kiếm quá ngắn' });
     }
 
+    // Sanitize regex special characters to prevent ReDoS attack
+    const escapedQuery = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     const sessions = await ChatSession.find({
       userId: req.user._id,
-      'messages.content': { $regex: q, $options: 'i' },
+      'messages.content': { $regex: escapedQuery, $options: 'i' },
     })
       .sort({ updatedAt: -1 })
       .limit(20)
