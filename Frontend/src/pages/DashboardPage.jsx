@@ -48,9 +48,9 @@ export default function DashboardPage() {
       try {
         // Fetch core data (available to all tiers)
         const [docsRes, fcRes, quizRes, chatRes] = await Promise.all([
-          api.get('/documents'),
-          api.get('/flashcards'),
-          api.get('/quiz'),
+          api.get('/documents').catch(() => ({ data: { documents: [] } })),
+          api.get('/flashcards').catch(() => ({ data: { flashcardSets: [] } })),
+          api.get('/quiz').catch(() => ({ data: { quizzes: [] } })),
           api.get('/chat/sessions').catch(() => ({ data: { sessions: [] } }))
         ]);
 

@@ -22,6 +22,13 @@ import NotebookPage from './pages/NotebookPage';
 import usePWA from './hooks/usePWA';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import PWAUpdatePrompt from './components/PWAUpdatePrompt';
+import { useAuth } from './context/AuthContext';
+
+function PremiumGuard({ children }) {
+  const { user } = useAuth();
+  if (user?.plan !== 'premium') return <Navigate to="/pricing" replace />;
+  return children;
+}
 
 function App() {
   const { isInstallable, installApp, needRefresh, updateServiceWorker } = usePWA();
@@ -47,10 +54,10 @@ function App() {
               <Route path="/flashcards/:id" element={<FlashcardsPage />} />
               <Route path="/quiz" element={<QuizPage />} />
               <Route path="/quiz/:id" element={<QuizPage />} />
-              {/* Premium pages */}
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/study-plan" element={<StudyPlanPage />} />
-              <Route path="/ai-tools" element={<AIToolsPage />} />
+              {/* Premium pages - guarded */}
+              <Route path="/analytics" element={<PremiumGuard><AnalyticsPage /></PremiumGuard>} />
+              <Route path="/study-plan" element={<PremiumGuard><StudyPlanPage /></PremiumGuard>} />
+              <Route path="/ai-tools" element={<PremiumGuard><AIToolsPage /></PremiumGuard>} />
               <Route path="/pricing" element={<PricingPage />} />
               {/* Notebook routes */}
               <Route path="/notebooks" element={<NotebookListPage />} />

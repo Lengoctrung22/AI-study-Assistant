@@ -76,7 +76,9 @@ exports.getPlans = async (req, res, next) => {
   try {
     const plans = await StudyPlan.find({ userId: req.user._id })
       .sort({ createdAt: -1 })
-      .populate('documents', 'title');
+      .populate('documents', 'title')
+      .limit(100)
+      .lean();
 
     res.json({ studyPlans: plans });
   } catch (error) {
@@ -90,7 +92,7 @@ exports.getPlan = async (req, res, next) => {
     const plan = await StudyPlan.findOne({
       _id: req.params.id,
       userId: req.user._id,
-    }).populate('documents', 'title');
+    }).populate('documents', 'title').lean();
 
     if (!plan) {
       return res.status(404).json({ message: 'Không tìm thấy kế hoạch' });
@@ -171,31 +173,24 @@ exports.logActivity = async (req, res, next) => {
   try {
     const { type, duration, documentId, metadata } = req.body;
     const today = getTodayString();
+    const durationNum = Number(duration) || 0;
 
-    let activity = await StudyActivity.findOne({
-      userId: req.user._id,
-      date: today,
-    });
-
-    if (!activity) {
-      activity = await StudyActivity.create({
-        userId: req.user._id,
-        date: today,
-        activities: [],
-        totalMinutes: 0,
-      });
-    }
-
-    activity.activities.push({
+    const activityItem = {
       type,
-      duration: duration || 0,
+      duration: durationNum,
       documentId,
       metadata: metadata || {},
       timestamp: new Date(),
-    });
+    };
 
-    activity.totalMinutes = activity.activities.reduce((sum, a) => sum + (a.duration || 0), 0);
-    await activity.save();
+    const activity = await StudyActivity.findOneAndUpdate(
+      { userId: req.user._id, date: today },
+      {
+        $push: { activities: activityItem },
+        $inc: { totalMinutes: durationNum },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
     res.json({ activity });
   } catch (error) {
@@ -215,7 +210,8 @@ exports.getStreak = async (req, res, next) => {
     })
       .sort({ date: -1 })
       .limit(365)
-      .select('date totalMinutes');
+      .select('date totalMinutes')
+      .lean();
 
     const activeActivities = activities.filter((a) => a.totalMinutes > 0);
     const streak = calculateStreak(activeActivities);
@@ -267,12 +263,13 @@ exports.getHeatmap = async (req, res, next) => {
     })
       .sort({ date: -1 })
       .limit(365)
-      .select('date totalMinutes activities');
+      .select('date totalMinutes activities')
+      .lean();
 
     const heatmapData = activities.map((a) => ({
       date: a.date,
       totalMinutes: a.totalMinutes,
-      count: a.activities.length,
+      count: (a.activities || []).length,
       level: a.totalMinutes > 120 ? 4 : a.totalMinutes > 60 ? 3 : a.totalMinutes > 30 ? 2 : a.totalMinutes > 0 ? 1 : 0,
     }));
 
@@ -286,7 +283,7 @@ exports.getHeatmap = async (req, res, next) => {
 exports.getSRDashboard = async (req, res, next) => {
   try {
     const FlashcardSet = require('../models/FlashcardSet');
-    const sets = await FlashcardSet.find({ userId: req.user._id });
+    const sets = await FlashcardSet.find({ userId: req.user._id }).limit(100).lean();
 
     const now = new Date();
     let totalCards = 0;

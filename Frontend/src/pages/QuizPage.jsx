@@ -124,7 +124,7 @@ export default function QuizPage() {
           <h1>{activeQuiz.title}</h1>
           <p>{activeQuiz.questions.length} câu hỏi • Độ khó: {activeQuiz.difficulty}</p>
         </div>
-        <QuizPlayer quiz={activeQuiz} />
+        <QuizPlayer key={activeQuiz._id} quiz={activeQuiz} />
       </div>
     );
   }

@@ -57,7 +57,7 @@ export default function NotebookPage() {
       setNotebook(nbRes.data.notebook);
       
       // Filter out documents already in this notebook, and only keep ready ones
-      const currentDocIds = nbRes.data.notebook.documents.map(d => d._id);
+      const currentDocIds = nbRes.data.notebook.documents?.map(d => d._id) || [];
       setAvailableDocs(
         (allDocsRes.data.documents || []).filter(
           d => d.status === 'ready' && !currentDocIds.includes(d._id)
@@ -389,10 +389,10 @@ export default function NotebookPage() {
           </form>
 
           <div className="notes-list">
-            {notebook.notes?.length === 0 ? (
+            {!notebook.notes || notebook.notes.length === 0 ? (
               <p style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', padding: '16px 0' }}>Chưa có ghi chú nào</p>
             ) : (
-              [...notebook.notes].reverse().map((note) => (
+              [...(notebook.notes || [])].reverse().map((note) => (
                 <div className="note-card" key={note._id}>
                   <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', color: 'var(--text-primary)' }}>{note.content}</div>
                   <div className="note-card-footer">

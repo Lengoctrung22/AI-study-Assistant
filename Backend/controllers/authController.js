@@ -12,16 +12,36 @@ exports.register = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
+    // Type validation to prevent NoSQL injection
+    if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ message: 'Dữ liệu không hợp lệ' });
+    }
+
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanName || !cleanEmail || !password) {
       return res.status(400).json({ message: 'Vui lòng nhập đầy đủ thông tin' });
     }
 
-    const existingUser = await User.findOne({ email });
+    if (cleanName.length > 50) {
+      return res.status(400).json({ message: 'Họ tên không được vượt quá 50 ký tự' });
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
+      return res.status(400).json({ message: 'Email không hợp lệ' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 6 ký tự' });
+    }
+
+    const existingUser = await User.findOne({ email: cleanEmail });
     if (existingUser) {
       return res.status(400).json({ message: 'Email đã được sử dụng' });
     }
 
-    const user = await User.create({ name, email, password });
+    const user = await User.create({ name: cleanName, email: cleanEmail, password });
     const token = generateToken(user._id);
 
     res.status(201).json({
@@ -44,11 +64,18 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
+    // Type validation to prevent NoSQL injection
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ message: 'Email hoặc mật khẩu không hợp lệ' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail || !password) {
       return res.status(400).json({ message: 'Vui lòng nhập email và mật khẩu' });
     }
 
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email: cleanEmail }).select('+password');
     if (!user) {
       return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
     }

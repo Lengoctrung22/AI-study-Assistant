@@ -16,9 +16,13 @@ export function AuthProvider({ children }) {
         .then((res) => {
           setUser(res.data.user);
         })
-        .catch(() => {
-          localStorage.removeItem('token');
-          setUser(null);
+        .catch((err) => {
+          // Only logout on explicit 401 authentication error
+          // Network errors (offline/server down) should preserve the session
+          if (err.response?.status === 401) {
+            localStorage.removeItem('token');
+            setUser(null);
+          }
         })
         .finally(() => setLoading(false));
     } else {
@@ -54,8 +58,7 @@ export function AuthProvider({ children }) {
   };
 
   const updateUser = (userData) => {
-    const updated = { ...user, ...userData };
-    setUser(updated);
+    setUser(prev => ({ ...prev, ...userData }));
   };
 
   return (

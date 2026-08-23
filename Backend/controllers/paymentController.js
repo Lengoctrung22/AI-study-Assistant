@@ -1,6 +1,31 @@
+const mongoose = require('mongoose');
 const Payment = require('../models/Payment');
 const User = require('../models/User');
 const PricingPlan = require('../models/PricingPlan');
+
+// Helper to run database operations inside a transaction with fallback for standalone MongoDB
+const withTransaction = async (workFn) => {
+  let session = null;
+  try {
+    session = await mongoose.startSession();
+    session.startTransaction();
+    const result = await workFn(session);
+    await session.commitTransaction();
+    return result;
+  } catch (err) {
+    if (session) {
+      try { await session.abortTransaction(); } catch (_) {}
+    }
+    if (err.message && (err.message.includes('replica set') || err.message.includes('Transaction numbers'))) {
+      return await workFn(null);
+    }
+    throw err;
+  } finally {
+    if (session) {
+      session.endSession();
+    }
+  }
+};
 
 // Helper: detect card brand from number
 const detectCardBrand = (number) => {
@@ -92,23 +117,27 @@ exports.checkout = async (req, res, next) => {
     const premiumExpiresAt = new Date();
     premiumExpiresAt.setMonth(premiumExpiresAt.getMonth() + planObj.durationMonths);
 
-    // Create successful payment record
-    const payment = await Payment.create({
-      userId: req.user._id,
-      plan,
-      amount: planObj.price,
-      method: paymentMethod,
-      status: 'completed',
-      cardLast4: paymentMethod === 'card' ? cardNumber.replace(/\s/g, '').slice(-4) : null,
-      cardBrand: paymentMethod === 'card' ? detectCardBrand(cardNumber) : null,
-      description: `Nâng cấp Premium (${planObj.name})`,
-    });
+    // Create successful payment record and update user plan atomically
+    let payment;
+    await withTransaction(async (session) => {
+      const opts = session ? { session } : {};
+      const [createdPayment] = await Payment.create([{
+        userId: req.user._id,
+        plan,
+        amount: planObj.price,
+        method: paymentMethod,
+        status: 'completed',
+        cardLast4: paymentMethod === 'card' ? cardNumber.replace(/\s/g, '').slice(-4) : null,
+        cardBrand: paymentMethod === 'card' ? detectCardBrand(cardNumber) : null,
+        description: `Nâng cấp Premium (${planObj.name})`,
+      }], opts);
+      payment = createdPayment;
 
-    // Update user to premium
-    await User.findByIdAndUpdate(req.user._id, {
-      plan: 'premium',
-      subscriptionType: plan,
-      premiumExpiresAt,
+      await User.findByIdAndUpdate(req.user._id, {
+        plan: 'premium',
+        subscriptionType: plan,
+        premiumExpiresAt,
+      }, opts);
     });
 
     res.status(200).json({
@@ -145,21 +174,23 @@ exports.cancelSubscription = async (req, res, next) => {
       return res.status(400).json({ message: 'Bạn không có gói Premium để hủy.' });
     }
 
-    // Create a cancellation record
-    await Payment.create({
-      userId: req.user._id,
-      plan: req.user.subscriptionType || 'monthly',
-      amount: 0,
-      method: 'card',
-      status: 'cancelled',
-      description: 'Hủy gói Premium',
-    });
+    // Create a cancellation record and downgrade user atomically
+    await withTransaction(async (session) => {
+      const opts = session ? { session } : {};
+      await Payment.create([{
+        userId: req.user._id,
+        plan: req.user.subscriptionType || 'monthly',
+        amount: 0,
+        method: 'card',
+        status: 'cancelled',
+        description: 'Hủy gói Premium',
+      }], opts);
 
-    // Downgrade user
-    await User.findByIdAndUpdate(req.user._id, {
-      plan: 'free',
-      subscriptionType: null,
-      premiumExpiresAt: null,
+      await User.findByIdAndUpdate(req.user._id, {
+        plan: 'free',
+        subscriptionType: null,
+        premiumExpiresAt: null,
+      }, opts);
     });
 
     res.json({
@@ -257,23 +288,29 @@ exports.checkQRStatus = async (req, res, next) => {
     }
 
     if (payment.status === 'pending') {
-      // Simulate real-time checking: automatically approve transaction after 12 seconds
+      // Simulation mode for testing (default in dev, disable in prod unless explicitly enabled)
+      const allowAutoApprove = process.env.NODE_ENV !== 'production' || process.env.ENABLE_MOCK_PAYMENT_AUTO_APPROVE === 'true';
       const elapsedMs = new Date() - new Date(payment.createdAt);
-      if (elapsedMs > 12000) {
+
+      if (allowAutoApprove && elapsedMs > 12000) {
         const planObj = await PricingPlan.findOne({ code: payment.plan });
         const durationMonths = planObj ? planObj.durationMonths : 1;
 
         const premiumExpiresAt = new Date();
         premiumExpiresAt.setMonth(premiumExpiresAt.getMonth() + durationMonths);
 
-        payment.status = 'completed';
-        await payment.save();
+        let user;
+        await withTransaction(async (session) => {
+          const opts = session ? { session } : {};
+          payment.status = 'completed';
+          await payment.save(opts);
 
-        const user = await User.findByIdAndUpdate(req.user._id, {
-          plan: 'premium',
-          subscriptionType: payment.plan,
-          premiumExpiresAt,
-        }, { new: true });
+          user = await User.findByIdAndUpdate(req.user._id, {
+            plan: 'premium',
+            subscriptionType: payment.plan,
+            premiumExpiresAt,
+          }, { new: true, ...opts });
+        });
 
         return res.json({
           status: 'completed',

@@ -54,7 +54,7 @@ export default function NotebookListPage() {
     setSelectedNotebookId(notebook._id);
     setTitle(notebook.title);
     setDescription(notebook.description);
-    setSelectedDocs(notebook.documents.map(d => d._id));
+    setSelectedDocs(notebook.documents?.map(d => d._id) || []);
     setIsModalOpen(true);
   };
 

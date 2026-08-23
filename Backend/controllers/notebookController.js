@@ -8,15 +8,21 @@ exports.createNotebook = async (req, res, next) => {
   try {
     const { title, description, documentIds } = req.body;
 
-    if (!title) {
-      return res.status(400).json({ message: 'Vui lòng nhập tiêu đề sổ tay' });
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ message: 'Vui lòng nhập tiêu đề sổ tay hợp lệ' });
     }
+
+    if (title.length > 200) {
+      return res.status(400).json({ message: 'Tiêu đề sổ tay không được vượt quá 200 ký tự' });
+    }
+
+    const cleanDescription = typeof description === 'string' ? description.substring(0, 2000) : '';
 
     // Verify documents belong to user
     let verifiedDocIds = [];
     if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
       const docs = await Document.find({
-        _id: { $in: documentIds },
+        _id: { $in: documentIds.slice(0, 10) },
         userId: req.user._id,
       });
       verifiedDocIds = docs.map(d => d._id);
@@ -24,8 +30,8 @@ exports.createNotebook = async (req, res, next) => {
 
     const notebook = await Notebook.create({
       userId: req.user._id,
-      title,
-      description: description || '',
+      title: title.trim(),
+      description: cleanDescription,
       documents: verifiedDocIds,
     });
 
@@ -145,20 +151,20 @@ exports.addDocuments = async (req, res, next) => {
       userId: req.user._id,
     });
 
-    const newDocIds = docs.map(d => d._id.toString());
-    const existingDocIds = notebook.documents.map(d => d.toString());
+    const newDocIds = docs.map(d => d._id);
+    const existingDocIds = (notebook.documents || []).map(d => d.toString());
 
-    // Add unique doc IDs
-    const mergedDocIds = [...new Set([...existingDocIds, ...newDocIds])];
-
-    if (mergedDocIds.length > 10) {
+    // Check document limit
+    const uniqueNewIds = newDocIds.filter(id => !existingDocIds.includes(id.toString()));
+    if (existingDocIds.length + uniqueNewIds.length > 10) {
       return res.status(400).json({ message: 'Một sổ tay nghiên cứu chỉ chứa tối đa 10 tài liệu' });
     }
 
-    notebook.documents = mergedDocIds;
-    await notebook.save();
-
-    const populatedNotebook = await notebook.populate('documents', 'title pageCount fileSize status');
+    const populatedNotebook = await Notebook.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { $addToSet: { documents: { $each: newDocIds } } },
+      { new: true }
+    ).populate('documents', 'title pageCount fileSize status');
 
     res.json({ notebook: populatedNotebook });
   } catch (error) {
@@ -169,21 +175,15 @@ exports.addDocuments = async (req, res, next) => {
 // DELETE /api/notebooks/:id/documents/:docId
 exports.removeDocument = async (req, res, next) => {
   try {
-    const notebook = await Notebook.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
+    const populatedNotebook = await Notebook.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { $pull: { documents: req.params.docId } },
+      { new: true }
+    ).populate('documents', 'title pageCount fileSize status');
 
-    if (!notebook) {
+    if (!populatedNotebook) {
       return res.status(404).json({ message: 'Không tìm thấy sổ tay nghiên cứu' });
     }
-
-    notebook.documents = notebook.documents.filter(
-      d => d.toString() !== req.params.docId
-    );
-
-    await notebook.save();
-    const populatedNotebook = await notebook.populate('documents', 'title pageCount fileSize status');
 
     res.json({ notebook: populatedNotebook });
   } catch (error) {
@@ -279,9 +279,15 @@ exports.sendMessage = async (req, res, next) => {
     const { message, sessionId } = req.body;
     const notebookId = req.params.id;
 
-    if (!message) {
-      return res.status(400).json({ message: 'Vui lòng nhập tin nhắn' });
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ message: 'Vui lòng nhập tin nhắn hợp lệ' });
     }
+
+    if (message.length > 4000) {
+      return res.status(400).json({ message: 'Tin nhắn không được vượt quá 4,000 ký tự' });
+    }
+
+    const cleanMessage = message.trim();
 
     const notebook = await Notebook.findOne({
       _id: notebookId,
@@ -320,7 +326,7 @@ exports.sendMessage = async (req, res, next) => {
       session = await ChatSession.create({
         userId: req.user._id,
         notebookId,
-        title: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
+        title: cleanMessage.substring(0, 50) + (cleanMessage.length > 50 ? '...' : ''),
         messages: [],
       });
     }
@@ -328,11 +334,11 @@ exports.sendMessage = async (req, res, next) => {
     // Add user message
     session.messages.push({
       role: 'user',
-      content: message,
+      content: cleanMessage,
     });
 
     // Chat with Notebook (Cross-doc RAG)
-    const { answer, citations } = await notebookService.queryNotebook(message, docs, notebookId);
+    const { answer, citations } = await notebookService.queryNotebook(cleanMessage, docs, notebookId);
 
     // Add assistant response
     session.messages.push({
@@ -340,6 +346,11 @@ exports.sendMessage = async (req, res, next) => {
       content: answer,
       citations,
     });
+
+    // Safeguard against unbounded embedded array exceeding MongoDB 16MB limit
+    if (session.messages.length > 500) {
+      session.messages = session.messages.slice(-500);
+    }
 
     await session.save();
 
@@ -369,7 +380,8 @@ exports.getSessions = async (req, res, next) => {
       notebookId: req.params.id,
     })
       .sort({ updatedAt: -1 })
-      .select('title createdAt updatedAt');
+      .select('title createdAt updatedAt')
+      .lean();
 
     res.json({ sessions });
   } catch (error) {
@@ -382,23 +394,25 @@ exports.addNote = async (req, res, next) => {
   try {
     const { content } = req.body;
 
-    if (!content) {
+    if (!content || typeof content !== 'string' || !content.trim()) {
       return res.status(400).json({ message: 'Nội dung ghi chú không được để trống' });
     }
 
-    const notebook = await Notebook.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
+    if (content.length > 10000) {
+      return res.status(400).json({ message: 'Nội dung ghi chú không được vượt quá 10,000 ký tự' });
+    }
 
-    if (!notebook) {
+    const updated = await Notebook.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { $push: { notes: { content: content.trim() } } },
+      { new: true }
+    );
+
+    if (!updated) {
       return res.status(404).json({ message: 'Không tìm thấy sổ tay nghiên cứu' });
     }
 
-    notebook.notes.push({ content });
-    await notebook.save();
-
-    res.status(201).json({ notes: notebook.notes });
+    res.status(201).json({ notes: updated.notes });
   } catch (error) {
     next(error);
   }
@@ -407,22 +421,17 @@ exports.addNote = async (req, res, next) => {
 // DELETE /api/notebooks/:id/notes/:noteId
 exports.deleteNote = async (req, res, next) => {
   try {
-    const notebook = await Notebook.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
+    const updated = await Notebook.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { $pull: { notes: { _id: req.params.noteId } } },
+      { new: true }
+    );
 
-    if (!notebook) {
+    if (!updated) {
       return res.status(404).json({ message: 'Không tìm thấy sổ tay nghiên cứu' });
     }
 
-    notebook.notes = notebook.notes.filter(
-      note => note._id.toString() !== req.params.noteId
-    );
-
-    await notebook.save();
-
-    res.json({ notes: notebook.notes });
+    res.json({ notes: updated.notes });
   } catch (error) {
     next(error);
   }

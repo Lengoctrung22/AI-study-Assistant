@@ -8,6 +8,11 @@ const LlmLog = require('../models/LlmLog');
 const ChatSession = require('../models/ChatSession');
 const Payment = require('../models/Payment');
 const PricingPlan = require('../models/PricingPlan');
+const FlashcardSet = require('../models/FlashcardSet');
+const Quiz = require('../models/Quiz');
+const Notebook = require('../models/Notebook');
+const StudyPlan = require('../models/StudyPlan');
+const StudyActivity = require('../models/StudyActivity');
 
 // GET /api/admin/stats
 exports.getStats = async (req, res, next) => {
@@ -217,7 +222,8 @@ exports.getRecentDocuments = async (req, res, next) => {
       .populate('userId', 'name email')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     res.json({
       documents,
@@ -244,7 +250,8 @@ exports.getUsers = async (req, res, next) => {
       .select('-password')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     res.json({
       users,
@@ -296,47 +303,17 @@ exports.getHealth = async (req, res, next) => {
       }
     }
 
-    // 3. Real Disk Space Check
+    // 3. Real Disk Space Check (Native cross-platform fs.promises.statfs)
     let diskFreeBytes = 0;
     let diskTotalBytes = 0;
     try {
-      // Async wrapper for exec to avoid blocking the event loop
-      const execAsync = (cmd) => new Promise((resolve, reject) => {
-        const { exec } = require('child_process');
-        exec(cmd, { encoding: 'utf-8', timeout: 5000 }, (error, stdout) => {
-          if (error) reject(error);
-          else resolve(stdout);
-        });
-      });
-
-      // Works on Windows (where the app is hosted)
-      const output = (await execAsync(
-        'wmic logicaldisk where "DeviceID=\'E:\'" get FreeSpace,Size /format:csv'
-      )).trim();
-      // Parse CSV: Node,FreeSpace,Size
-      const lines = output.split('\n').filter(l => l.trim());
-      const lastLine = lines[lines.length - 1].trim();
-      const parts = lastLine.split(',');
-      if (parts.length >= 3) {
-        diskFreeBytes = parseInt(parts[1]) || 0;
-        diskTotalBytes = parseInt(parts[2]) || 0;
-      }
+      const stats = await fs.promises.statfs(process.cwd());
+      const freeBlocks = typeof stats.bavail === 'bigint' || typeof stats.bavail === 'number' ? stats.bavail : stats.bfree;
+      diskTotalBytes = Number(stats.blocks) * Number(stats.bsize);
+      diskFreeBytes = Number(freeBlocks) * Number(stats.bsize);
     } catch (diskErr) {
-      // Fallback: try cross-platform df approach or just report unknown
-      try {
-        const { exec } = require('child_process');
-        const dfOutput = await new Promise((resolve, reject) => {
-          exec('df -B1 / | tail -1', { encoding: 'utf-8', timeout: 5000 }, (error, stdout) => {
-            if (error) reject(error);
-            else resolve(stdout);
-          });
-        });
-        const parts = dfOutput.trim().split(/\s+/);
-        diskTotalBytes = parseInt(parts[1]) || 0;
-        diskFreeBytes = parseInt(parts[3]) || 0;
-      } catch (_) {
-        // Could not determine disk space
-      }
+      diskFreeBytes = 0;
+      diskTotalBytes = 0;
     }
 
     const formatBytes = (bytes) => {
@@ -378,19 +355,39 @@ exports.getHealth = async (req, res, next) => {
 exports.createUser = async (req, res, next) => {
   try {
     const { name, email, password, role, plan } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin bắt buộc' });
+    if (!name || !email || !password || typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin bắt buộc hợp lệ' });
     }
-    const existingUser = await User.findOne({ email });
+
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanName || !cleanEmail) {
+      return res.status(400).json({ message: 'Tên và email không được để trống' });
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
+      return res.status(400).json({ message: 'Email không hợp lệ' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 6 ký tự' });
+    }
+
+    const existingUser = await User.findOne({ email: cleanEmail });
     if (existingUser) {
       return res.status(400).json({ message: 'Email đã tồn tại' });
     }
+
+    const userRole = ['user', 'admin'].includes(role) ? role : 'user';
+    const userPlan = ['free', 'premium'].includes(plan) ? plan : 'free';
+
     const user = await User.create({
-      name,
-      email,
+      name: cleanName,
+      email: cleanEmail,
       password,
-      role: role || 'user',
-      plan: plan || 'free'
+      role: userRole,
+      plan: userPlan
     });
     const userResponse = user.toObject();
     delete userResponse.password;
@@ -408,6 +405,11 @@ exports.updateUserRole = async (req, res, next) => {
     if (!['user', 'admin'].includes(role)) {
       return res.status(400).json({ message: 'Vai trò không hợp lệ' });
     }
+
+    if (userId === req.user._id.toString() && role === 'user') {
+      return res.status(400).json({ message: 'Bạn không thể tự hạ quyền tài khoản của chính mình' });
+    }
+
     const user = await User.findByIdAndUpdate(userId, { role }, { new: true }).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'Không tìm thấy người dùng' });
@@ -475,25 +477,30 @@ exports.deleteUser = async (req, res, next) => {
       return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }
     
-    // Find all documents of this user to clean up files and embeddings
-    const docs = await Document.find({ userId });
+    // Clean up physical files and embeddings for all user documents
+    const docs = await Document.find({ userId }).select('_id filePath').lean();
     for (const doc of docs) {
-      if (fs.existsSync(doc.filePath)) {
-        fs.unlinkSync(doc.filePath);
+      if (doc.filePath && fs.existsSync(doc.filePath)) {
+        try { fs.unlinkSync(doc.filePath); } catch (_) {}
       }
       try {
         await deleteDocumentChunks(doc._id);
       } catch (e) {
         console.warn('ChromaDB delete failed during user cleanup:', e.message);
       }
-      await Document.findByIdAndDelete(doc._id);
     }
 
-    // Delete user's chat sessions
-    await ChatSession.deleteMany({ userId });
-
-    // Finally delete the user
-    await User.findByIdAndDelete(userId);
+    // Delete all entities associated with this user
+    await Promise.all([
+      Document.deleteMany({ userId }),
+      ChatSession.deleteMany({ userId }),
+      FlashcardSet.deleteMany({ userId }),
+      Quiz.deleteMany({ userId }),
+      Notebook.deleteMany({ userId }),
+      StudyPlan.deleteMany({ userId }),
+      StudyActivity.deleteMany({ userId }),
+      User.findByIdAndDelete(userId),
+    ]);
 
     res.json({ message: 'Đã xóa người dùng và toàn bộ dữ liệu liên quan thành công' });
   } catch (err) {
@@ -547,7 +554,8 @@ exports.getPayments = async (req, res, next) => {
       .populate('userId', 'name email')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     const total = await Payment.countDocuments();
 
@@ -574,7 +582,8 @@ exports.getLlmLogs = async (req, res, next) => {
     const logs = await LlmLog.find()
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     const total = await LlmLog.countDocuments();
 

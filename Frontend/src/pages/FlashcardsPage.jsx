@@ -73,7 +73,7 @@ export default function FlashcardsPage() {
           <h1>{activeSet.title}</h1>
           <p>{activeSet.cards.length} thẻ • Tạo từ: {activeSet.documentId?.title || 'N/A'}</p>
         </div>
-        <FlashcardStudy set={activeSet} />
+        <FlashcardStudy key={activeSet._id} set={activeSet} />
       </div>
     );
   }

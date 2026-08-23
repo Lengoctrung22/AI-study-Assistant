@@ -89,7 +89,7 @@ export default function PricingPage() {
 
   useEffect(() => {
     return () => {
-      if (pollingInterval) clearInterval(pollingInterval);
+      if (pollingInterval) clearTimeout(pollingInterval);
     };
   }, [pollingInterval]);
 
@@ -103,24 +103,28 @@ export default function PricingPage() {
   };
 
   const startQRPolling = (txnId) => {
-    if (pollingInterval) clearInterval(pollingInterval);
+    if (pollingInterval) clearTimeout(pollingInterval);
 
-    const interval = setInterval(async () => {
+    const poll = async () => {
       try {
         const res = await api.get(`/payments/status/${txnId}`);
         if (res.data.status === 'completed') {
-          clearInterval(interval);
           setPollingInterval(null);
           setPaymentResult(res.data);
           updateUser(res.data.user);
           setCheckoutStep('success');
+          return; // Stop polling
         }
       } catch (err) {
         console.error('Polling status error:', err);
       }
-    }, 3000);
+      // Schedule next poll only after current one completes
+      const timeout = setTimeout(poll, 3000);
+      setPollingInterval(timeout);
+    };
 
-    setPollingInterval(interval);
+    const timeout = setTimeout(poll, 3000);
+    setPollingInterval(timeout);
   };
 
   const handleQRInit = async () => {
@@ -144,7 +148,7 @@ export default function PricingPage() {
       handleQRInit();
     } else {
       if (pollingInterval) {
-        clearInterval(pollingInterval);
+        clearTimeout(pollingInterval);
         setPollingInterval(null);
       }
       setQrData(null);
@@ -259,7 +263,7 @@ export default function PricingPage() {
 
   const closeCheckout = () => {
     if (pollingInterval) {
-      clearInterval(pollingInterval);
+      clearTimeout(pollingInterval);
       setPollingInterval(null);
     }
     setShowCheckout(false);
@@ -506,6 +510,7 @@ export default function PricingPage() {
                           value={cardNumber}
                           onChange={handleCardNumberChange}
                           maxLength={19}
+                          autoComplete="off"
                         />
                       </div>
                       <div className="input-group">
@@ -516,6 +521,7 @@ export default function PricingPage() {
                           placeholder="NGUYEN VAN A"
                           value={cardName}
                           onChange={(e) => setCardName(e.target.value.toUpperCase())}
+                          autoComplete="off"
                         />
                       </div>
                       <div className="checkout-form-row">
@@ -528,6 +534,7 @@ export default function PricingPage() {
                             value={expiry}
                             onChange={handleExpiryChange}
                             maxLength={5}
+                            autoComplete="off"
                           />
                         </div>
                         <div className="input-group">
@@ -539,6 +546,7 @@ export default function PricingPage() {
                             value={cvv}
                             onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
                             maxLength={4}
+                            autoComplete="off"
                           />
                         </div>
                       </div>

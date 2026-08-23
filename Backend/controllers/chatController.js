@@ -11,9 +11,15 @@ exports.sendMessage = async (req, res, next) => {
     const { message, sessionId } = req.body;
     const { documentId } = req.params;
 
-    if (!message) {
-      return res.status(400).json({ message: 'Vui lòng nhập tin nhắn' });
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ message: 'Vui lòng nhập tin nhắn hợp lệ' });
     }
+
+    if (message.length > 4000) {
+      return res.status(400).json({ message: 'Tin nhắn không được vượt quá 4,000 ký tự' });
+    }
+
+    const cleanMessage = message.trim();
 
     const document = await Document.findOne({
       _id: documentId,
@@ -38,7 +44,7 @@ exports.sendMessage = async (req, res, next) => {
       session = await ChatSession.create({
         userId: req.user._id,
         documentId,
-        title: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
+        title: cleanMessage.substring(0, 50) + (cleanMessage.length > 50 ? '...' : ''),
         messages: [],
       });
     }
@@ -46,7 +52,7 @@ exports.sendMessage = async (req, res, next) => {
     // Add user message
     session.messages.push({
       role: 'user',
-      content: message,
+      content: cleanMessage,
     });
 
     // Get AI response via RAG — with persona for premium users
@@ -54,12 +60,12 @@ exports.sendMessage = async (req, res, next) => {
     const isPremium = req.user.plan === 'premium';
 
     if (isPremium) {
-      const result = await queryDocumentWithPersona(message, documentId, req.user.tutorPersona || 'friendly');
+      const result = await queryDocumentWithPersona(cleanMessage, documentId, req.user.tutorPersona || 'friendly');
       answer = result.answer;
       citations = result.citations;
       suggestedQuestions = result.suggestedQuestions || [];
     } else {
-      const result = await queryDocument(message, documentId);
+      const result = await queryDocument(cleanMessage, documentId);
       answer = result.answer;
       citations = result.citations;
     }
@@ -70,6 +76,11 @@ exports.sendMessage = async (req, res, next) => {
       content: answer,
       citations,
     });
+
+    // Safeguard against unbounded embedded array exceeding MongoDB 16MB limit
+    if (session.messages.length > 500) {
+      session.messages = session.messages.slice(-500);
+    }
 
     await session.save();
 
@@ -140,12 +151,22 @@ exports.sendMultiDocMessage = async (req, res, next) => {
   try {
     const { message, documentIds } = req.body;
 
-    if (!message) {
-      return res.status(400).json({ message: 'Vui lòng nhập tin nhắn' });
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ message: 'Vui lòng nhập tin nhắn hợp lệ' });
     }
+
+    if (message.length > 4000) {
+      return res.status(400).json({ message: 'Tin nhắn không được vượt quá 4,000 ký tự' });
+    }
+
+    const cleanMessage = message.trim();
 
     if (!documentIds || !Array.isArray(documentIds) || documentIds.length < 2) {
       return res.status(400).json({ message: 'Vui lòng chọn ít nhất 2 tài liệu' });
+    }
+
+    if (documentIds.length > 10) {
+      return res.status(400).json({ message: 'Chỉ hỗ trợ tối đa 10 tài liệu cùng lúc' });
     }
 
     // Verify all documents belong to user
@@ -162,7 +183,7 @@ exports.sendMultiDocMessage = async (req, res, next) => {
     const allChunks = [];
     for (const docId of documentIds) {
       try {
-        const chunks = await searchChunks(message, docId, 3);
+        const chunks = await searchChunks(cleanMessage, docId, 3);
         const doc = documents.find((d) => d._id.toString() === docId);
         chunks.forEach((chunk) => {
           chunk.metadata.documentTitle = doc ? doc.title : 'Unknown';
@@ -188,7 +209,7 @@ exports.sendMultiDocMessage = async (req, res, next) => {
       .join('\n\n');
 
     const persona = req.user.tutorPersona || 'friendly';
-    const prompt = PREMIUM_PROMPTS.CHAT_WITH_FOLLOWUP(message, context, persona);
+    const prompt = PREMIUM_PROMPTS.CHAT_WITH_FOLLOWUP(cleanMessage, context, persona);
     const response = await generateContent(prompt);
 
     let answer = response;
@@ -237,7 +258,9 @@ exports.getSessions = async (req, res, next) => {
     const sessions = await ChatSession.find(filter)
       .sort({ updatedAt: -1 })
       .select('title documentId createdAt updatedAt')
-      .populate('documentId', 'title');
+      .populate('documentId', 'title')
+      .limit(100)
+      .lean();
 
     res.json({ sessions });
   } catch (error) {
@@ -251,7 +274,7 @@ exports.getSession = async (req, res, next) => {
     const session = await ChatSession.findOne({
       _id: req.params.id,
       userId: req.user._id,
-    }).populate('documentId', 'title');
+    }).populate('documentId', 'title').lean();
 
     if (!session) {
       return res.status(404).json({ message: 'Không tìm thấy phiên chat' });

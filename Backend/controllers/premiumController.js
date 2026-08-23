@@ -7,6 +7,7 @@ const {
   generateAnalytics,
   generateGlossary,
 } = require('../services/premiumAIService');
+const fs = require('fs');
 
 // POST /api/premium/documents/:id/mindmap
 exports.generateMindMap = async (req, res, next) => {
@@ -26,12 +27,15 @@ exports.generateMindMap = async (req, res, next) => {
       return res.json({ mindMap: document.mindMap, cached: true });
     }
 
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({ message: 'File tài liệu không tồn tại trên hệ thống' });
+    }
+
     const { text } = await parsePDF(document.filePath);
     const cleaned = cleanText(text);
     const mindMap = await generateMindMap(cleaned);
 
-    document.mindMap = mindMap;
-    await document.save();
+    await Document.updateOne({ _id: document._id }, { $set: { mindMap } });
 
     res.json({ mindMap, cached: false });
   } catch (error) {
@@ -56,12 +60,15 @@ exports.generateConcepts = async (req, res, next) => {
       return res.json({ concepts: document.concepts, cached: true });
     }
 
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({ message: 'File tài liệu không tồn tại trên hệ thống' });
+    }
+
     const { text } = await parsePDF(document.filePath);
     const cleaned = cleanText(text);
     const concepts = await generateConcepts(cleaned);
 
-    document.concepts = concepts;
-    await document.save();
+    await Document.updateOne({ _id: document._id }, { $set: { concepts } });
 
     res.json({ concepts, cached: false });
   } catch (error) {
@@ -92,22 +99,27 @@ exports.generateMultiLevelSummary = async (req, res, next) => {
     }
 
     // If all levels are cached
-    if (document.multiLevelSummary && Object.keys(document.multiLevelSummary).length === 5 && !req.body.regenerate) {
+    const validLevels = ['child', 'high_school', 'undergraduate', 'graduate', 'expert'];
+    if (document.multiLevelSummary && validLevels.every(l => document.multiLevelSummary[l]) && !req.body.regenerate) {
       return res.json({ multiLevelSummary: document.multiLevelSummary, cached: true });
+    }
+
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({ message: 'File tài liệu không tồn tại trên hệ thống' });
     }
 
     const { text } = await parsePDF(document.filePath);
     const cleaned = cleanText(text);
 
-    const levels = requestedLevel ? [requestedLevel] : ['child', 'high_school', 'undergraduate', 'graduate', 'expert'];
+    const levels = (requestedLevel && validLevels.includes(requestedLevel)) ? [requestedLevel] : validLevels;
     const summaries = await generateMultiLevelSummary(cleaned, levels);
 
-    // Merge with existing cache
-    document.multiLevelSummary = {
-      ...(document.multiLevelSummary || {}),
-      ...summaries,
-    };
-    await document.save();
+    // Merge with existing cache atomically
+    const updateFields = {};
+    for (const [lvl, sum] of Object.entries(summaries)) {
+      updateFields[`multiLevelSummary.${lvl}`] = sum;
+    }
+    await Document.updateOne({ _id: document._id }, { $set: updateFields });
 
     res.json({ multiLevelSummary: summaries, cached: false });
   } catch (error) {
@@ -132,12 +144,15 @@ exports.generateDocumentAnalytics = async (req, res, next) => {
       return res.json({ analytics: document.analytics, cached: true });
     }
 
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({ message: 'File tài liệu không tồn tại trên hệ thống' });
+    }
+
     const { text } = await parsePDF(document.filePath);
     const cleaned = cleanText(text);
     const analytics = await generateAnalytics(cleaned);
 
-    document.analytics = analytics;
-    await document.save();
+    await Document.updateOne({ _id: document._id }, { $set: { analytics } });
 
     res.json({ analytics, cached: false });
   } catch (error) {
@@ -162,12 +177,15 @@ exports.generateGlossary = async (req, res, next) => {
       return res.json({ glossary: document.glossary, cached: true });
     }
 
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({ message: 'File tài liệu không tồn tại trên hệ thống' });
+    }
+
     const { text } = await parsePDF(document.filePath);
     const cleaned = cleanText(text);
     const glossary = await generateGlossary(cleaned);
 
-    document.glossary = glossary;
-    await document.save();
+    await Document.updateOne({ _id: document._id }, { $set: { glossary } });
 
     res.json({ glossary, cached: false });
   } catch (error) {
@@ -182,7 +200,7 @@ exports.getWeakAreas = async (req, res, next) => {
     const quizzes = await Quiz.find({
       userId: req.user._id,
       status: 'completed',
-    }).select('questions result difficulty');
+    }).select('questions result difficulty').limit(200).lean();
 
     if (quizzes.length === 0) {
       return res.json({ weakAreas: [], message: 'Chưa có dữ liệu quiz để phân tích' });

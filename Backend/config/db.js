@@ -44,13 +44,30 @@ const seedPricingPlans = async () => {
   }
 };
 
+const crypto = require('crypto');
+
 const seedAdminUser = async () => {
   try {
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@gmail.com';
-    const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || '123123';
+    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@gmail.com').trim().toLowerCase();
+    let adminPassword = process.env.ADMIN_INITIAL_PASSWORD;
     
     const adminExists = await User.findOne({ role: 'admin' });
     if (!adminExists) {
+      if (!adminPassword || adminPassword === '123123') {
+        if (process.env.NODE_ENV === 'production') {
+          adminPassword = crypto.randomBytes(16).toString('hex');
+          // Write password to a secure temp file instead of logging it to console
+          const fs = require('fs');
+          const path = require('path');
+          const credFile = path.join(__dirname, '..', '.admin_credentials_DELETEME');
+          fs.writeFileSync(credFile, `Admin Email: ${adminEmail}\nAdmin Password: ${adminPassword}\n\n⚠️ DELETE THIS FILE IMMEDIATELY AFTER READING!\n`, { mode: 0o600 });
+          console.warn(`🔒 Admin account created. Credentials written to ${credFile} — READ AND DELETE THIS FILE IMMEDIATELY.`);
+        } else {
+          adminPassword = '123123';
+          console.warn(`⚠️ WARNING: Admin seeded with default development password (123123). Please set ADMIN_INITIAL_PASSWORD in .env!`);
+        }
+      }
+
       await User.create({
         name: 'Quản trị viên',
         email: adminEmail,
@@ -67,7 +84,11 @@ const seedAdminUser = async () => {
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+      maxPoolSize: 50,
+      minPoolSize: 5,
+      serverSelectionTimeoutMS: 5000,
+    });
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
     await seedPricingPlans();
     await seedAdminUser();

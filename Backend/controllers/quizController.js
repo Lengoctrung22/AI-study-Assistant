@@ -5,6 +5,39 @@ const { generateQuiz } = require('../services/quizService');
 const { generateContent } = require('../config/gemini');
 const PREMIUM_PROMPTS = require('../utils/premiumPromptTemplates');
 const { chunkText } = require('../utils/chunker');
+const fs = require('fs');
+
+/**
+ * Sanitize quiz object to prevent leaking answers and explanations
+ * when quiz is not completed.
+ *
+ * @param {Object|mongoose.Document} quizDoc
+ * @returns {Object} Sanitized plain object
+ */
+function sanitizeQuiz(quizDoc) {
+  if (!quizDoc) return null;
+  const quiz = typeof quizDoc.toObject === 'function'
+    ? quizDoc.toObject()
+    : JSON.parse(JSON.stringify(quizDoc));
+
+  if (quiz && quiz.status !== 'completed') {
+    quiz.questions = (quiz.questions || []).map((q) => {
+      const sanitized = {
+        question: q.question || '',
+        type: q.type || 'mcq',
+        options: Array.isArray(q.options) ? q.options : [],
+        topic: q.topic || '',
+      };
+      if (q._id !== undefined && q._id !== null) {
+        sanitized._id = q._id;
+      }
+      return sanitized;
+    });
+  }
+  return quiz;
+}
+
+exports.sanitizeQuiz = sanitizeQuiz;
 
 // POST /api/quiz/generate/:documentId
 exports.generateFromDocument = async (req, res, next) => {
@@ -18,13 +51,17 @@ exports.generateFromDocument = async (req, res, next) => {
       return res.status(404).json({ message: 'Không tìm thấy tài liệu' });
     }
 
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({ message: 'File tài liệu không tồn tại trên hệ thống' });
+    }
+
     const { text } = await parsePDF(document.filePath);
     const cleaned = cleanText(text);
-    const count = parseInt(req.body.count) || 10;
-    const difficulty = req.body.difficulty || 'mixed';
-    const questionTypes = req.body.questionTypes || ['mcq'];
-    const timerMode = req.body.timerMode || 'none';
-    const timeLimit = parseInt(req.body.timeLimit) || 0;
+    const count = Math.max(1, Math.min(30, parseInt(req.body.count) || 10));
+    const difficulty = ['easy', 'medium', 'hard', 'mixed'].includes(req.body.difficulty) ? req.body.difficulty : 'mixed';
+    const questionTypes = Array.isArray(req.body.questionTypes) ? req.body.questionTypes : ['mcq'];
+    const timerMode = ['none', 'per_question', 'total'].includes(req.body.timerMode) ? req.body.timerMode : 'none';
+    const timeLimit = Math.max(0, Math.min(7200, parseInt(req.body.timeLimit) || 0));
 
     let questions;
 
@@ -48,7 +85,7 @@ exports.generateFromDocument = async (req, res, next) => {
       result: { score: null, total: questions.length, answers: [] },
     });
 
-    res.status(201).json({ quiz });
+    res.status(201).json({ quiz: sanitizeQuiz(quiz) });
   } catch (error) {
     next(error);
   }
@@ -96,7 +133,9 @@ exports.getQuizzes = async (req, res, next) => {
     const quizzes = await Quiz.find({ userId: req.user._id })
       .sort({ createdAt: -1 })
       .populate('documentId', 'title')
-      .select('-questions.correctAnswer -questions.explanation -questions.blankAnswer -questions.correctBoolean -questions.shortAnswer');
+      .select('-questions.correctAnswer -questions.explanation -questions.blankAnswer -questions.correctBoolean -questions.shortAnswer')
+      .limit(200)
+      .lean();
 
     res.json({ quizzes });
   } catch (error) {
@@ -116,19 +155,7 @@ exports.getQuiz = async (req, res, next) => {
       return res.status(404).json({ message: 'Không tìm thấy bài quiz' });
     }
 
-    // If not completed, hide answers
-    if (quiz.status !== 'completed') {
-      const sanitized = quiz.toObject();
-      sanitized.questions = sanitized.questions.map((q) => ({
-        question: q.question,
-        type: q.type || 'mcq',
-        options: q.options,
-        topic: q.topic,
-      }));
-      return res.json({ quiz: sanitized });
-    }
-
-    res.json({ quiz });
+    res.json({ quiz: sanitizeQuiz(quiz) });
   } catch (error) {
     next(error);
   }
@@ -255,7 +282,7 @@ exports.retakeQuiz = async (req, res, next) => {
       parentQuizId: originalQuiz._id,
     });
 
-    res.status(201).json({ quiz: newQuiz, adaptedDifficulty: difficulty });
+    res.status(201).json({ quiz: sanitizeQuiz(newQuiz), adaptedDifficulty: difficulty });
   } catch (error) {
     next(error);
   }
@@ -269,7 +296,9 @@ exports.getQuizAnalytics = async (req, res, next) => {
       status: 'completed',
     })
       .sort({ createdAt: -1 })
-      .populate('documentId', 'title');
+      .populate('documentId', 'title')
+      .limit(200)
+      .lean();
 
     if (quizzes.length === 0) {
       return res.json({ analytics: null, message: 'Chưa có dữ liệu quiz' });
@@ -335,8 +364,8 @@ exports.getQuizAnalytics = async (req, res, next) => {
         scoreOverTime,
         topicPerformance: topicData,
         improvement: recentAvg - olderAvg,
-        bestTopic: topicData.sort((a, b) => b.accuracy - a.accuracy)[0] || null,
-        worstTopic: topicData.sort((a, b) => a.accuracy - b.accuracy)[0] || null,
+        bestTopic: [...topicData].sort((a, b) => b.accuracy - a.accuracy)[0] || null,
+        worstTopic: [...topicData].sort((a, b) => a.accuracy - b.accuracy)[0] || null,
       },
     });
   } catch (error) {

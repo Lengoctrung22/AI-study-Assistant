@@ -22,6 +22,14 @@ const notebookRoutes = require('./routes/notebookRoutes');
 
 const app = express();
 
+// Trust proxy (required for rate limiting behind reverse proxies like Nginx/Cloudflare/Render)
+app.set('trust proxy', 1);
+
+// Security: Check critical environment variables
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'your_super_secret_jwt_key_should_be_long_and_random_string_here') {
+  console.warn('⚠️ WARNING: JWT_SECRET is missing or using default development value. Set a strong secret in production!');
+}
+
 // Security: HTTP headers (X-Frame-Options, HSTS, XSS filter, etc.)
 app.use(helmet({
   contentSecurityPolicy: false, // CSP is handled by frontend meta tag
@@ -77,10 +85,10 @@ const authLimiter = rateLimit({
 app.use('/api', apiLimiter);
 
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static files for uploads - Protect or limit if necessary
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+// Static files for uploads has been REMOVED for security reasons.
+// File downloads must go through authenticated route GET /api/documents/:id/download.
 
 // Routes
 app.use('/api/auth', authLimiter, authRoutes); // Rate limited: 15 req / 15 min
@@ -102,9 +110,11 @@ app.get('/api/health', (req, res) => {
 // Serve frontend static files in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '..', 'Frontend', 'dist')));
-  app.get(/.*/, (req, res) => {
+  app.get(/.*/, (req, res, next) => {
     if (!req.path.startsWith('/api')) {
       res.sendFile(path.join(__dirname, '..', 'Frontend', 'dist', 'index.html'));
+    } else {
+      next();
     }
   });
 }

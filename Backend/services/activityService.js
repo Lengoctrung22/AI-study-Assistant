@@ -13,34 +13,23 @@ const recordActivity = async (userId, type, duration = 0, documentId = null, met
   try {
     const today = getTodayString();
     
-    // Find or create activity document for this user on this day
-    let activity = await StudyActivity.findOne({
-      userId,
-      date: today,
-    });
-
-    if (!activity) {
-      activity = new StudyActivity({
-        userId,
-        date: today,
-        activities: [],
-        totalMinutes: 0,
-      });
-    }
-
-    // Add activity entry
-    activity.activities.push({
+    const durationNum = Number(duration) || 0;
+    const activityItem = {
       type,
-      duration: duration || 0,
+      duration: durationNum,
       documentId: documentId || undefined,
       metadata: metadata || {},
       timestamp: new Date(),
-    });
+    };
 
-    // Update totalMinutes
-    activity.totalMinutes = activity.activities.reduce((sum, act) => sum + (act.duration || 0), 0);
-
-    await activity.save();
+    const activity = await StudyActivity.findOneAndUpdate(
+      { userId, date: today },
+      {
+        $push: { activities: activityItem },
+        $inc: { totalMinutes: durationNum },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
     // Invalidate sync cache for this user since new data was recorded
     _syncCache.delete(String(userId));

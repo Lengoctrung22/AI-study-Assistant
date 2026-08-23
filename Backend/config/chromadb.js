@@ -65,7 +65,10 @@ class MongoCollectionMock {
       filter.documentId = where.documentId;
     }
 
-    const chunks = await VectorChunk.find(filter);
+    const chunks = await VectorChunk.find(filter)
+      .select('id text embedding metadata')
+      .lean()
+      .limit(2000);
     
     // Calculate similarities
     const scored = chunks.map((c) => {
@@ -95,7 +98,7 @@ class MongoCollectionMock {
     if (where && where.documentId) {
       filter.documentId = where.documentId;
     }
-    const chunks = await VectorChunk.find(filter);
+    const chunks = await VectorChunk.find(filter).lean();
     return {
       ids: chunks.map(c => c.id),
       documents: chunks.map(c => c.text),

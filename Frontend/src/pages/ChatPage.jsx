@@ -119,7 +119,8 @@ export default function ChatPage() {
 
     if (!overrideMessage) setInput('');
     setSuggestions([]);
-    setMessages((m) => [...m, { role: 'user', content: msg }]);
+    const tempId = Date.now().toString();
+    setMessages((m) => [...m, { role: 'user', content: msg, _tempId: tempId }]);
     setSending(true);
 
     try {
@@ -142,7 +143,7 @@ export default function ChatPage() {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gửi tin nhắn thất bại');
-      setMessages((m) => m.slice(0, -1));
+      setMessages((m) => m.filter((msg) => msg._tempId !== tempId));
     } finally { setSending(false); }
   };
 

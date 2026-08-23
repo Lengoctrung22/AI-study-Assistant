@@ -130,6 +130,7 @@ export default function DocumentDetailPage() {
           <div>
             <textarea className="input" rows={4} placeholder="Dán đoạn text khó hiểu vào đây..."
               value={explainText} onChange={(e) => setExplainText(e.target.value)}
+              maxLength={2000}
               style={{ width: '100%', marginBottom: 12, resize: 'vertical' }} />
             <button className="btn btn-primary btn-sm" onClick={handleExplain} disabled={explaining || !explainText.trim()}>
               {explaining ? 'Đang giải thích...' : <><HiOutlineLightBulb /> Giải thích</>}

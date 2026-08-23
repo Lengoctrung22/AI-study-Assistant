@@ -27,6 +27,7 @@ const quizSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Document',
     required: true,
+    index: true,
   },
   title: {
     type: String,

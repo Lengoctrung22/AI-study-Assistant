@@ -19,8 +19,6 @@ import toast from 'react-hot-toast';
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
-  // Double guard: prevent rendering if not admin (backup for AdminLayout guard)
-  if (!user || user.role !== 'admin') return null;
   const location = useLocation();
   
   // Determine active view based on URL path
@@ -238,6 +236,10 @@ export default function AdminDashboardPage() {
       fetchLlmLogs();
     }
   }, [activeTab, page, statusFilter, usersPage, paymentsPage, logsPage]);
+
+  // Guard: prevent rendering if not admin (backup for AdminLayout guard)
+  // Placed after all hooks to comply with Rules of Hooks
+  if (!user || user.role !== 'admin') return null;
 
   const formatStorage = (bytes) => {
     if (!bytes) return '0 B';

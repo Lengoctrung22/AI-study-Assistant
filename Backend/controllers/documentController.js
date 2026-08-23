@@ -1,4 +1,8 @@
 const Document = require('../models/Document');
+const FlashcardSet = require('../models/FlashcardSet');
+const Quiz = require('../models/Quiz');
+const ChatSession = require('../models/ChatSession');
+const Notebook = require('../models/Notebook');
 const { parsePDF, cleanText } = require('../services/pdfService');
 const { chunkText } = require('../utils/chunker');
 const { embedAndStoreChunks } = require('../services/embeddingService');
@@ -100,7 +104,9 @@ exports.getDocuments = async (req, res, next) => {
   try {
     const documents = await Document.find({ userId: req.user._id })
       .sort({ createdAt: -1 })
-      .select('-filePath');
+      .select('-filePath')
+      .limit(200)
+      .lean();
 
     res.json({ documents });
   } catch (error) {
@@ -146,9 +152,9 @@ exports.deleteDocument = async (req, res, next) => {
       return res.status(404).json({ message: 'Không tìm thấy tài liệu' });
     }
 
-    // Delete file
-    if (fs.existsSync(document.filePath)) {
-      fs.unlinkSync(document.filePath);
+    // Clean up physical file
+    if (document.filePath && fs.existsSync(document.filePath)) {
+      try { fs.unlinkSync(document.filePath); } catch (_) {}
     }
 
     // Delete embeddings from ChromaDB
@@ -158,9 +164,19 @@ exports.deleteDocument = async (req, res, next) => {
       console.warn('ChromaDB delete failed:', e.message);
     }
 
-    await Document.findByIdAndDelete(document._id);
+    // Cascade delete related records and pull from notebooks
+    await Promise.all([
+      Document.findByIdAndDelete(document._id),
+      FlashcardSet.deleteMany({ documentId: document._id }),
+      Quiz.deleteMany({ documentId: document._id }),
+      ChatSession.deleteMany({ documentId: document._id }),
+      Notebook.updateMany(
+        { userId: req.user._id, documents: document._id },
+        { $pull: { documents: document._id } }
+      ),
+    ]);
 
-    res.json({ message: 'Đã xóa tài liệu' });
+    res.json({ message: 'Đã xóa tài liệu và toàn bộ dữ liệu liên quan thành công' });
   } catch (error) {
     next(error);
   }
@@ -196,12 +212,16 @@ exports.explainText = async (req, res, next) => {
   try {
     const { text, context, level } = req.body;
 
-    if (!text) {
+    if (!text || typeof text !== 'string' || !text.trim()) {
       return res.status(400).json({ message: 'Vui lòng cung cấp đoạn text cần giải thích' });
     }
 
+    if (text.length > 5000) {
+      return res.status(400).json({ message: 'Đoạn văn bản cần giải thích không được vượt quá 5,000 ký tự' });
+    }
+
     const explanation = await generateContent(
-      PROMPTS.EXPLAIN(text, context || '', level || 'student')
+      PROMPTS.EXPLAIN(text.trim(), (typeof context === 'string' ? context.substring(0, 5000) : ''), level || 'student')
     );
 
     res.json({ explanation });
@@ -222,9 +242,36 @@ exports.getDocumentText = async (req, res, next) => {
       return res.status(404).json({ message: 'Không tìm thấy tài liệu' });
     }
 
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({ message: 'File tài liệu không tồn tại trên hệ thống' });
+    }
+
     const { text } = await parsePDF(document.filePath);
     res.json({ text: cleanText(text) });
   } catch (error) {
     next(error);
   }
 };
+
+// GET /api/documents/:id/download (Secure authenticated file stream)
+exports.downloadDocument = async (req, res, next) => {
+  try {
+    const document = await Document.findOne({
+      _id: req.params.id,
+      userId: req.user._id,
+    });
+
+    if (!document) {
+      return res.status(404).json({ message: 'Không tìm thấy tài liệu hoặc bạn không có quyền truy cập' });
+    }
+
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({ message: 'File tài liệu không tồn tại trên máy chủ' });
+    }
+
+    res.download(document.filePath, document.fileName);
+  } catch (error) {
+    next(error);
+  }
+};
+

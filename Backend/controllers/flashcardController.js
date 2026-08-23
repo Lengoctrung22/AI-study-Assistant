@@ -2,6 +2,7 @@ const FlashcardSet = require('../models/FlashcardSet');
 const Document = require('../models/Document');
 const { parsePDF, cleanText } = require('../services/pdfService');
 const { generateFlashcards } = require('../services/flashcardService');
+const fs = require('fs');
 
 // POST /api/flashcards/generate/:documentId
 exports.generateFromDocument = async (req, res, next) => {
@@ -15,9 +16,13 @@ exports.generateFromDocument = async (req, res, next) => {
       return res.status(404).json({ message: 'Không tìm thấy tài liệu' });
     }
 
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({ message: 'File tài liệu không tồn tại trên hệ thống' });
+    }
+
     const { text } = await parsePDF(document.filePath);
     const cleaned = cleanText(text);
-    const count = parseInt(req.body.count) || 10;
+    const count = Math.max(1, Math.min(30, parseInt(req.body.count) || 10));
     const cards = await generateFlashcards(cleaned, count);
 
     const flashcardSet = await FlashcardSet.create({
@@ -47,7 +52,9 @@ exports.getFlashcardSets = async (req, res, next) => {
   try {
     const sets = await FlashcardSet.find({ userId: req.user._id })
       .sort({ createdAt: -1 })
-      .populate('documentId', 'title');
+      .populate('documentId', 'title')
+      .limit(200)
+      .lean();
 
     res.json({ flashcardSets: sets });
   } catch (error) {
@@ -61,7 +68,7 @@ exports.getFlashcardSet = async (req, res, next) => {
     const set = await FlashcardSet.findOne({
       _id: req.params.id,
       userId: req.user._id,
-    }).populate('documentId', 'title');
+    }).populate('documentId', 'title').lean();
 
     if (!set) {
       return res.status(404).json({ message: 'Không tìm thấy bộ flashcard' });
@@ -118,18 +125,33 @@ exports.reviewCard = async (req, res, next) => {
 
     card.nextReview = new Date(Date.now() + card.interval * 24 * 60 * 60 * 1000);
 
-    set.totalReviews += 1;
-    await set.save();
+    const updatedSet = await FlashcardSet.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      {
+        $set: {
+          [`cards.${cardIndex}.interval`]: card.interval,
+          [`cards.${cardIndex}.repetitions`]: card.repetitions,
+          [`cards.${cardIndex}.easeFactor`]: card.easeFactor,
+          [`cards.${cardIndex}.nextReview`]: card.nextReview,
+        },
+        $inc: { totalReviews: 1 }
+      },
+      { new: true }
+    );
+
+    if (!updatedSet) {
+      return res.status(404).json({ message: 'Không tìm thấy bộ flashcard' });
+    }
 
     // Record study activity (flashcard review = 2 mins per card)
     try {
       const { recordActivity } = require('../services/activityService');
-      await recordActivity(req.user._id, 'flashcard_review', 2, set.documentId);
+      await recordActivity(req.user._id, 'flashcard_review', 2, updatedSet.documentId);
     } catch (actError) {
       console.error('Failed to log flashcard review activity:', actError.message);
     }
 
-    res.json({ card: set.cards[cardIndex], totalReviews: set.totalReviews });
+    res.json({ card: updatedSet.cards[cardIndex], totalReviews: updatedSet.totalReviews });
   } catch (error) {
     next(error);
   }

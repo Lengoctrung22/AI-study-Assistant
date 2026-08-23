@@ -5,3 +5,7 @@ chroma_data/
 dist/
 .DS_Store
 *.log
+.admin_credentials*
+.agents/*
+!.agents/skills/
+Backend/scratch/

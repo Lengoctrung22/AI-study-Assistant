@@ -25,8 +25,8 @@ export default function PWAInstallPrompt({ isInstallable, installApp }) {
   };
 
   const handleInstall = async () => {
-    setShowPrompt(false);
     await installApp();
+    setShowPrompt(false);
   };
 
   if (!showPrompt) return null;
