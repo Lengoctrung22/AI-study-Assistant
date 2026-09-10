@@ -130,12 +130,13 @@ async function generateMultiTypeQuiz(text, count, difficulty, types) {
 // GET /api/quiz
 exports.getQuizzes = async (req, res, next) => {
   try {
-    const quizzes = await Quiz.find({ userId: req.user._id })
+    const rawQuizzes = await Quiz.find({ userId: req.user._id })
       .sort({ createdAt: -1 })
       .populate('documentId', 'title')
-      .select('-questions.correctAnswer -questions.explanation -questions.blankAnswer -questions.correctBoolean -questions.shortAnswer')
       .limit(200)
       .lean();
+
+    const quizzes = rawQuizzes.map((q) => sanitizeQuiz(q));
 
     res.json({ quizzes });
   } catch (error) {
@@ -192,10 +193,17 @@ exports.submitQuiz = async (req, res, next) => {
       } else if (qType === 'fill_blank') {
         if (String(userAnswer || '').toLowerCase().trim() === String(q.blankAnswer || '').toLowerCase().trim()) score++;
       } else if (qType === 'short_answer') {
-        // Simplified check — exact match or close enough
         const user = String(userAnswer || '').toLowerCase().trim();
         const correct = String(q.shortAnswer || '').toLowerCase().trim();
-        if (user && (user === correct || correct.includes(user) || user.includes(correct))) score++;
+        if (user && correct) {
+          if (user === correct) {
+            score++;
+          } else if (user.length >= 3 && correct.includes(user) && user.length >= correct.length * 0.6) {
+            score++;
+          } else if (correct.length >= 3 && user.includes(correct) && correct.length >= user.length * 0.6) {
+            score++;
+          }
+        }
       }
     });
 
@@ -330,8 +338,14 @@ exports.getQuizAnalytics = async (req, res, next) => {
         else if (qType === 'short_answer') {
           const user = String(userAnswer || '').toLowerCase().trim();
           const correct = String(q.shortAnswer || '').toLowerCase().trim();
-          if (user && (user === correct || correct.includes(user) || user.includes(correct))) {
-            topicPerformance[topic].correct++;
+          if (user && correct) {
+            if (user === correct) {
+              topicPerformance[topic].correct++;
+            } else if (user.length >= 3 && correct.includes(user) && user.length >= correct.length * 0.6) {
+              topicPerformance[topic].correct++;
+            } else if (correct.length >= 3 && user.includes(correct) && correct.length >= user.length * 0.6) {
+              topicPerformance[topic].correct++;
+            }
           }
         }
       });

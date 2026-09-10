@@ -212,7 +212,7 @@ export default function NotebookPage() {
     try {
       const res = await api.get(`/chat/sessions/${session._id}`);
       setSessionId(session._id);
-      setMessages(res.data.messages || []);
+      setMessages(res.data.messages || res.data.session?.messages || []);
       toast.success(`Đã mở: ${session.title}`);
     } catch (err) {
       toast.error('Không thể tải cuộc trò chuyện');

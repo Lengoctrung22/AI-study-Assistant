@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { HiOutlineCalendarDays, HiOutlineFire, HiOutlineClock, HiOutlineCheckCircle, HiOutlineTrash } from 'react-icons/hi2';
 import { PiCrownBold } from 'react-icons/pi';
+import toast from 'react-hot-toast';
 
 export default function StudyPlanPage() {
   const { user } = useAuth();
@@ -27,15 +28,22 @@ export default function StudyPlanPage() {
   }, [isPremium]);
 
   const createPlan = async () => {
-    if (form.documentIds.length === 0 || !form.targetDate) return;
+    if (form.documentIds.length === 0 || !form.targetDate) {
+      return toast.error('Vui lòng chọn tài liệu và ngày hoàn thành mục tiêu');
+    }
     setLoading(true);
     try {
       const r = await api.post('/study-plan/generate', form);
       setPlans(p => [r.data.studyPlan, ...p]);
       setShowCreate(false);
       setForm({ title: '', documentIds: [], targetDate: '', dailyHours: 2 });
-    } catch (e) { console.error(e); }
-    setLoading(false);
+      toast.success('Đã tạo kế hoạch học tập mới với AI!');
+    } catch (e) { 
+      console.error(e);
+      toast.error(e.response?.data?.message || 'Không thể tạo kế hoạch học tập');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleTask = async (planId, dayIndex, taskIndex) => {
@@ -43,15 +51,23 @@ export default function StudyPlanPage() {
       const r = await api.put(`/study-plan/${planId}/task`, { dayIndex, taskIndex });
       setPlans(p => p.map(plan => plan._id === planId ? r.data.studyPlan : plan));
       if (selectedPlan?._id === planId) setSelectedPlan(r.data.studyPlan);
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error(e);
+      toast.error(e.response?.data?.message || 'Không thể cập nhật nhiệm vụ');
+    }
   };
 
   const deletePlan = async (planId) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa kế hoạch học tập này?')) return;
     try {
       await api.delete(`/study-plan/${planId}`);
       setPlans(p => p.filter(plan => plan._id !== planId));
       if (selectedPlan?._id === planId) setSelectedPlan(null);
-    } catch (e) { console.error(e); }
+      toast.success('Đã xóa kế hoạch học tập');
+    } catch (e) { 
+      console.error(e);
+      toast.error(e.response?.data?.message || 'Xóa kế hoạch thất bại');
+    }
   };
 
   if (!isPremium) {

@@ -10,7 +10,7 @@ const parsePDF = async (filePath) => {
   try {
     const ext = path.extname(filePath).toLowerCase();
 
-    if (ext === '.docx' || ext === '.doc') {
+    if (ext === '.docx') {
       const result = await mammoth.extractRawText({ path: filePath });
       const text = result.value || '';
       
@@ -23,10 +23,12 @@ const parsePDF = async (filePath) => {
         pageCount,
         info: { Title: path.basename(filePath) }
       };
+    } else if (ext === '.doc') {
+      throw new Error('Định dạng Word cũ (.doc) không được hỗ trợ. Vui lòng lưu tệp dưới định dạng .docx hoặc .pdf trước khi tải lên.');
     }
 
-    // Default to PDF parsing
-    const dataBuffer = fs.readFileSync(filePath);
+    // Default to PDF parsing (asynchronous non-blocking read)
+    const dataBuffer = await fs.promises.readFile(filePath);
     const data = await pdfParse(dataBuffer);
 
     return {
@@ -38,7 +40,7 @@ const parsePDF = async (filePath) => {
     const ext = path.extname(filePath).toLowerCase();
     const isWord = ext === '.docx' || ext === '.doc';
     console.error(`${isWord ? 'Word' : 'PDF'} Parse Error:`, error.message);
-    throw new Error(`Không thể đọc file ${isWord ? 'Word (.docx)' : 'PDF'}: ${error.message}`);
+    throw new Error(error.message || `Không thể đọc file ${isWord ? 'Word (.docx)' : 'PDF'}`);
   }
 };
 

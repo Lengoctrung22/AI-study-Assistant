@@ -107,7 +107,8 @@ exports.getPlan = async (req, res, next) => {
 // PUT /api/study-plan/:id/task
 exports.toggleTask = async (req, res, next) => {
   try {
-    const { dayIndex, taskIndex } = req.body;
+    const dayIndex = Number(req.body.dayIndex);
+    const taskIndex = Number(req.body.taskIndex);
 
     const plan = await StudyPlan.findOne({
       _id: req.params.id,
@@ -118,12 +119,12 @@ exports.toggleTask = async (req, res, next) => {
       return res.status(404).json({ message: 'Không tìm thấy kế hoạch' });
     }
 
-    if (dayIndex < 0 || dayIndex >= plan.dailyPlan.length) {
+    if (!Number.isInteger(dayIndex) || dayIndex < 0 || dayIndex >= (plan.dailyPlan || []).length) {
       return res.status(400).json({ message: 'Day index không hợp lệ' });
     }
 
     const day = plan.dailyPlan[dayIndex];
-    if (taskIndex < 0 || taskIndex >= day.tasks.length) {
+    if (!day || !Number.isInteger(taskIndex) || taskIndex < 0 || taskIndex >= (day.tasks || []).length) {
       return res.status(400).json({ message: 'Task index không hợp lệ' });
     }
 
@@ -227,9 +228,11 @@ exports.getStreak = async (req, res, next) => {
       } else {
         const prev = new Date(sorted[i - 1].date);
         const curr = new Date(sorted[i].date);
-        const diff = (curr - prev) / (1000 * 60 * 60 * 24);
+        const diff = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
         if (diff === 1) {
           currentStreak++;
+        } else if (diff === 0) {
+          // Same day, do not reset
         } else {
           currentStreak = 1;
         }

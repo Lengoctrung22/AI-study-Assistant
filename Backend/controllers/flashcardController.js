@@ -83,7 +83,8 @@ exports.getFlashcardSet = async (req, res, next) => {
 // PUT /api/flashcards/:id/review
 exports.reviewCard = async (req, res, next) => {
   try {
-    const { cardIndex, quality } = req.body;
+    const cardIndex = Number(req.body.cardIndex);
+    const rawQ = Number(req.body.quality);
     // quality: 0-5 (SM-2 algorithm)
 
     const set = await FlashcardSet.findOne({
@@ -95,14 +96,20 @@ exports.reviewCard = async (req, res, next) => {
       return res.status(404).json({ message: 'Không tìm thấy bộ flashcard' });
     }
 
-    if (cardIndex < 0 || cardIndex >= set.cards.length) {
+    if (!Number.isInteger(cardIndex) || cardIndex < 0 || cardIndex >= (set.cards || []).length) {
       return res.status(400).json({ message: 'Card index không hợp lệ' });
     }
 
     const card = set.cards[cardIndex];
+    if (!card) {
+      return res.status(400).json({ message: 'Thẻ không tồn tại' });
+    }
 
     // SM-2 Algorithm
-    const q = Math.max(0, Math.min(5, quality));
+    const q = Number.isFinite(rawQ) ? Math.max(0, Math.min(5, Math.round(rawQ))) : 3;
+    card.repetitions = card.repetitions || 0;
+    card.interval = card.interval || 1;
+    card.easeFactor = card.easeFactor || 2.5;
 
     if (q >= 3) {
       if (card.repetitions === 0) {

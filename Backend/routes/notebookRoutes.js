@@ -20,11 +20,13 @@ router.delete('/:id/documents/:docId', notebookController.removeDocument);
 router.post('/:id/notes', notebookController.addNote);
 router.delete('/:id/notes/:noteId', notebookController.deleteNote);
 
+const { aiLimiter } = require('../middleware/rateLimiter');
+
 // AI Generation routes
-router.post('/:id/generate/:type', notebookController.generateOutput);
+router.post('/:id/generate/:type', aiLimiter, notebookController.generateOutput);
 
 // Notebook Chat Q&A routes
-router.post('/:id/chat', notebookController.sendMessage);
+router.post('/:id/chat', aiLimiter, notebookController.sendMessage);
 router.get('/:id/chat/sessions', notebookController.getSessions);
 
 module.exports = router;

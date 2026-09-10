@@ -1,6 +1,15 @@
 const StudyActivity = require('../models/StudyActivity');
 const { getTodayString } = require('./studyPlanService');
 
+// In-memory cache for tracking last sync time per user (cooldown: 10 minutes)
+const _syncCache = new Map();
+const SYNC_COOLDOWN_MS = 10 * 60 * 1000;
+
+const formatDateVN = (date) => {
+  if (!date) return getTodayString();
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(date));
+};
+
 /**
  * Record a user study activity
  * @param {string|ObjectId} userId
@@ -31,9 +40,6 @@ const recordActivity = async (userId, type, duration = 0, documentId = null, met
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    // Invalidate sync cache for this user since new data was recorded
-    _syncCache.delete(String(userId));
-
     return activity;
   } catch (error) {
     console.error('Error in recordActivity:', error);
@@ -41,41 +47,30 @@ const recordActivity = async (userId, type, duration = 0, documentId = null, met
 };
 
 /**
- * In-memory cache to throttle syncActivitiesFromEntities.
- * Key: userId (string), Value: timestamp of last sync (ms).
- * The sync is expensive (4 full collection scans), so we only run it
- * at most once every SYNC_COOLDOWN_MS per user.
- */
-const _syncCache = new Map();
-const SYNC_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
-
-/**
- * Synchronize study activities from existing database entities (Documents, Flashcards, Quizzes, Chats)
+ * Scan existing database entities and populate historical StudyActivity records.
+ * Uses a 10-minute cooldown to prevent database hammering on high-frequency requests.
+ * Preserves user-recorded live activity and never destructively overwrites real minutes.
  * @param {string|ObjectId} userId
- * @param {boolean} force - if true, bypass the cooldown cache
  */
-const syncActivitiesFromEntities = async (userId, force = false) => {
+const syncActivitiesFromEntities = async (userId) => {
   try {
     const userKey = String(userId);
-    const lastSync = _syncCache.get(userKey);
     const now = Date.now();
+    const lastSync = _syncCache.get(userKey);
 
-    // Skip sync if we ran it recently for this user (unless forced)
-    if (!force && lastSync && (now - lastSync) < SYNC_COOLDOWN_MS) {
-      return;
+    if (lastSync && (now - lastSync) < SYNC_COOLDOWN_MS) {
+      return; // Skip sync, cooldown active
     }
 
     const Document = require('../models/Document');
     const FlashcardSet = require('../models/FlashcardSet');
     const Quiz = require('../models/Quiz');
     const ChatSession = require('../models/ChatSession');
-    const StudyActivity = require('../models/StudyActivity');
 
-    // Object to hold aggregated minutes per date: { "YYYY-MM-DD": { totalMinutes: 0, activities: [] } }
+    // Key: YYYY-MM-DD, Value: { totalMinutes, activities: [] }
     const dailyData = {};
 
     const addDuration = (dateStr, type, duration, documentId, metadata) => {
-      if (!dateStr) return;
       if (!dailyData[dateStr]) {
         dailyData[dateStr] = {
           totalMinutes: 0,
@@ -95,7 +90,7 @@ const syncActivitiesFromEntities = async (userId, force = false) => {
     // 1. Process Documents
     const docs = await Document.find({ userId });
     for (const doc of docs) {
-      const dateStr = doc.createdAt.toISOString().split('T')[0];
+      const dateStr = formatDateVN(doc.createdAt);
       const duration = Math.max(5, Math.min(30, (doc.pageCount || 1) * 3));
       addDuration(dateStr, 'document_view', duration, doc._id, { title: doc.title, isUpload: true });
     }
@@ -103,11 +98,11 @@ const syncActivitiesFromEntities = async (userId, force = false) => {
     // 2. Process FlashcardSets
     const sets = await FlashcardSet.find({ userId });
     for (const set of sets) {
-      const dateStr = set.createdAt.toISOString().split('T')[0];
+      const dateStr = formatDateVN(set.createdAt);
       addDuration(dateStr, 'flashcard_review', 10, set.documentId, { title: set.title, isCreation: true });
 
       if (set.totalReviews > 0) {
-        const updateDateStr = set.updatedAt.toISOString().split('T')[0];
+        const updateDateStr = formatDateVN(set.updatedAt);
         const reviewDuration = Math.min(30, set.totalReviews * 2);
         addDuration(updateDateStr, 'flashcard_review', reviewDuration, set.documentId, { title: set.title, reviews: set.totalReviews });
       }
@@ -117,7 +112,7 @@ const syncActivitiesFromEntities = async (userId, force = false) => {
     const quizzes = await Quiz.find({ userId, status: 'completed' });
     for (const quiz of quizzes) {
       const completedDate = quiz.result?.completedAt || quiz.updatedAt || quiz.createdAt;
-      const dateStr = completedDate.toISOString().split('T')[0];
+      const dateStr = formatDateVN(completedDate);
       const duration = Math.max(5, Math.ceil((quiz.result?.timeSpent || 600) / 60));
       addDuration(dateStr, 'quiz_complete', duration, quiz.documentId, { title: quiz.title, score: quiz.result?.score });
     }
@@ -128,26 +123,32 @@ const syncActivitiesFromEntities = async (userId, force = false) => {
       for (const msg of session.messages) {
         if (msg.role === 'user') {
           const msgDate = msg.timestamp || session.createdAt;
-          const dateStr = msgDate.toISOString().split('T')[0];
+          const dateStr = formatDateVN(msgDate);
           addDuration(dateStr, 'chat_message', 3, session.documentId, { title: session.title });
         }
       }
     }
 
-    // 5. Save all aggregated data to StudyActivity (upsert)
+    // 5. Save all aggregated data to StudyActivity safely (merge, never destroy)
     for (const [date, data] of Object.entries(dailyData)) {
       const totalMins = Math.min(480, data.totalMinutes); // cap at 8 hours max per day
       
-      await StudyActivity.findOneAndUpdate(
-        { userId, date },
-        {
-          $set: {
-            activities: data.activities.slice(0, 100),
-            totalMinutes: totalMins,
-          },
-        },
-        { upsert: true, new: true }
-      );
+      const existing = await StudyActivity.findOne({ userId, date });
+      if (existing) {
+        if (existing.totalMinutes < totalMins) {
+          await StudyActivity.updateOne(
+            { _id: existing._id },
+            { $set: { totalMinutes: totalMins } }
+          );
+        }
+      } else {
+        await StudyActivity.create({
+          userId,
+          date,
+          activities: data.activities.slice(0, 100),
+          totalMinutes: totalMins,
+        });
+      }
     }
 
     // Update cache timestamp after successful sync
@@ -161,4 +162,3 @@ module.exports = {
   recordActivity,
   syncActivitiesFromEntities,
 };
-

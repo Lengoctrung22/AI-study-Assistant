@@ -1,5 +1,6 @@
 const { generateContent } = require('../config/gemini');
 const PREMIUM_PROMPTS = require('../utils/premiumPromptTemplates');
+const { extractJson } = require('../utils/jsonParser');
 
 /**
  * Generate AI study plan
@@ -10,9 +11,8 @@ const generateStudyPlanAI = async (documentTitles, totalDays, dailyHours) => {
   );
 
   try {
-    const cleaned = response.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-    const plan = JSON.parse(cleaned);
-    if (!Array.isArray(plan)) throw new Error('Not an array');
+    const plan = extractJson(response, []);
+    if (!Array.isArray(plan) || plan.length === 0) throw new Error('Not an array or empty');
     return plan;
   } catch (err) {
     console.error('Study plan parse error:', err.message);
@@ -21,10 +21,10 @@ const generateStudyPlanAI = async (documentTitles, totalDays, dailyHours) => {
 };
 
 /**
- * Get today's date string in YYYY-MM-DD format
+ * Get today's date string in YYYY-MM-DD format (Vietnam Timezone: Asia/Ho_Chi_Minh)
  */
 const getTodayString = () => {
-  return new Date().toISOString().split('T')[0];
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
 };
 
 /**
@@ -42,11 +42,11 @@ const calculateStreak = (activities) => {
   const today = getTodayString();
 
   let streak = 0;
-  let checkDate = new Date(today);
+  let checkDate = new Date();
   let retriedToday = false;
 
   for (let i = 0; i < sorted.length; i++) {
-    const dateStr = checkDate.toISOString().split('T')[0];
+    const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(checkDate);
 
     if (sorted.find((a) => a.date === dateStr)) {
       streak++;

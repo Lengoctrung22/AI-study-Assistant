@@ -7,6 +7,11 @@ const requirePremium = (req, res, next) => {
     return res.status(401).json({ message: 'Không có quyền truy cập' });
   }
 
+  // Admin users bypass all premium restrictions
+  if (req.user.role === 'admin') {
+    return next();
+  }
+
   // Check if user has premium plan
   if (req.user.plan !== 'premium') {
     return res.status(403).json({

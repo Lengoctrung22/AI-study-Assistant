@@ -18,17 +18,13 @@ const generateFlashcards = async (text, count = 10) => {
 
   const response = await generateContent(PROMPTS.FLASHCARD(contentForCards, count));
 
+  const { extractJson } = require('../utils/jsonParser');
+
   try {
-    // Clean response - remove markdown code blocks if present
-    const cleaned = response
-      .replace(/```json\s*/g, '')
-      .replace(/```\s*/g, '')
-      .trim();
+    const cards = extractJson(response, []);
 
-    const cards = JSON.parse(cleaned);
-
-    if (!Array.isArray(cards)) {
-      throw new Error('Response is not an array');
+    if (!Array.isArray(cards) || cards.length === 0) {
+      throw new Error('Response is not an array or is empty');
     }
 
     return cards.map((card) => ({

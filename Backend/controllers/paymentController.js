@@ -29,7 +29,7 @@ const withTransaction = async (workFn) => {
 
 // Helper: detect card brand from number
 const detectCardBrand = (number) => {
-  const cleaned = number.replace(/\s/g, '');
+  const cleaned = String(number || '').replace(/\s/g, '');
   if (/^4/.test(cleaned)) return 'Visa';
   if (/^5[1-5]/.test(cleaned)) return 'Mastercard';
   if (/^3[47]/.test(cleaned)) return 'Amex';
@@ -41,7 +41,7 @@ const detectCardBrand = (number) => {
 // Helper: basic card validation (Luhn-like format check for simulation)
 const validateCardInfo = ({ cardNumber, cardName, expiry, cvv }) => {
   const errors = [];
-  const cleaned = (cardNumber || '').replace(/\s/g, '');
+  const cleaned = String(cardNumber || '').replace(/\s/g, '');
   if (!/^\d{13,19}$/.test(cleaned)) errors.push('Số thẻ không hợp lệ');
   if (!cardName || cardName.trim().length < 2) errors.push('Tên chủ thẻ không hợp lệ');
   if (!/^\d{2}\/\d{2}$/.test(expiry || '')) {

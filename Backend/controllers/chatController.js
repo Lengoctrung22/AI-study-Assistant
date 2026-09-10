@@ -280,7 +280,7 @@ exports.getSession = async (req, res, next) => {
       return res.status(404).json({ message: 'Không tìm thấy phiên chat' });
     }
 
-    res.json({ session });
+    res.json({ session, messages: session.messages || [] });
   } catch (error) {
     next(error);
   }

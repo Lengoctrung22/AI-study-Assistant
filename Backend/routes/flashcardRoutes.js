@@ -9,7 +9,9 @@ const {
   deleteFlashcardSet,
 } = require('../controllers/flashcardController');
 
-router.post('/generate/:documentId', auth, generateFromDocument);
+const { aiLimiter } = require('../middleware/rateLimiter');
+
+router.post('/generate/:documentId', auth, aiLimiter, generateFromDocument);
 router.get('/', auth, getFlashcardSets);
 router.get('/:id', auth, getFlashcardSet);
 router.put('/:id/review', auth, reviewCard);

@@ -4,6 +4,8 @@ const auth = require('../middleware/auth');
 const requirePremium = require('../middleware/requirePremium');
 const studyPlanController = require('../controllers/studyPlanController');
 
+const { aiLimiter } = require('../middleware/rateLimiter');
+
 // All study plan routes require auth
 router.use(auth);
 
@@ -13,7 +15,7 @@ router.get('/heatmap', studyPlanController.getHeatmap);
 router.post('/activity', studyPlanController.logActivity);
 
 // Premium study plan CRUD
-router.post('/generate', requirePremium, studyPlanController.generatePlan);
+router.post('/generate', requirePremium, aiLimiter, studyPlanController.generatePlan);
 router.get('/', requirePremium, studyPlanController.getPlans);
 router.get('/sr-dashboard', requirePremium, studyPlanController.getSRDashboard);
 router.get('/:id', requirePremium, studyPlanController.getPlan);

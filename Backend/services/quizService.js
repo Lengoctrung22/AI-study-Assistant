@@ -16,16 +16,13 @@ const generateQuiz = async (text, count = 10, difficulty = 'mixed') => {
 
   const response = await generateContent(PROMPTS.QUIZ(contentForQuiz, count, difficulty));
 
+  const { extractJson } = require('../utils/jsonParser');
+
   try {
-    const cleaned = response
-      .replace(/```json\s*/g, '')
-      .replace(/```\s*/g, '')
-      .trim();
+    const questions = extractJson(response, []);
 
-    const questions = JSON.parse(cleaned);
-
-    if (!Array.isArray(questions)) {
-      throw new Error('Response is not an array');
+    if (!Array.isArray(questions) || questions.length === 0) {
+      throw new Error('Response is not an array or is empty');
     }
 
     return questions.map((q) => ({

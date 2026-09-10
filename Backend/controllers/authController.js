@@ -52,6 +52,10 @@ exports.register = async (req, res, next) => {
         email: user.email,
         plan: user.plan,
         role: user.role,
+        subscriptionType: user.subscriptionType,
+        premiumExpiresAt: user.premiumExpiresAt,
+        tutorPersona: user.tutorPersona || 'friendly',
+        createdAt: user.createdAt,
       },
     });
   } catch (error) {
@@ -99,6 +103,10 @@ exports.login = async (req, res, next) => {
         email: user.email,
         plan: user.plan,
         role: user.role,
+        subscriptionType: user.subscriptionType,
+        premiumExpiresAt: user.premiumExpiresAt,
+        tutorPersona: user.tutorPersona || 'friendly',
+        createdAt: user.createdAt,
       },
     });
   } catch (error) {

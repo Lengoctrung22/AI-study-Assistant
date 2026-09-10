@@ -82,6 +82,9 @@ exports.updateNotebook = async (req, res, next) => {
     if (description !== undefined) updateData.description = description;
 
     if (documentIds && Array.isArray(documentIds)) {
+      if (documentIds.length > 10) {
+        return res.status(400).json({ message: 'Một sổ tay chỉ được chứa tối đa 10 tài liệu nguồn' });
+      }
       // Verify documents belong to user
       const docs = await Document.find({
         _id: { $in: documentIds },

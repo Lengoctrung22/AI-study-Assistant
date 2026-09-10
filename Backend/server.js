@@ -38,7 +38,8 @@ app.use(helmet({
 
 // Security: CORS — restrict to known origins (not wildcard)
 const allowedOrigins = [
-  'http://localhost:5173',  // Vite dev server
+  'http://localhost:3000',  // Vite dev server
+  'http://localhost:5173',  // Vite dev server default
   'http://localhost:5000',  // Backend in dev
   process.env.FRONTEND_URL, // Production frontend URL
 ].filter(Boolean);
@@ -55,32 +56,8 @@ app.use(cors({
   credentials: true,
 }));
 
-// Security: General API Rate Limiter
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 300, // 300 requests per 15 mins per IP
-  message: { message: 'Quá nhiều yêu cầu đến hệ thống. Vui lòng thử lại sau.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Security: AI & Sensitive Request Rate Limiter (Chat, Quiz, Mindmap, Summarize)
-const aiLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 40, // max 40 AI generations per 5 mins per IP
-  message: { message: 'Tần suất gửi yêu cầu AI quá nhanh. Vui lòng đợi 5 phút trước khi thử lại.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Security: Rate limiting for auth endpoints (prevent brute-force)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 15, // max 15 login/register attempts per 15 mins per IP
-  message: { message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Security: Rate Limiters
+const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
 
 app.use('/api', apiLimiter);
 
@@ -94,9 +71,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/auth', authLimiter, authRoutes); // Rate limited: 15 req / 15 min
 app.use('/api/documents', documentRoutes);
 app.use('/api/flashcards', flashcardRoutes);
-app.use('/api/quiz', aiLimiter, quizRoutes);
-app.use('/api/chat', aiLimiter, chatRoutes);
-app.use('/api/premium', aiLimiter, premiumRoutes);
+app.use('/api/quiz', quizRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/premium', premiumRoutes);
 app.use('/api/study-plan', studyPlanRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentRoutes);
@@ -118,6 +95,11 @@ if (process.env.NODE_ENV === 'production') {
     }
   });
 }
+
+// 404 JSON handler for unmatched API endpoints
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ message: 'API endpoint không tồn tại' });
+});
 
 // Error handler
 app.use(errorHandler);

@@ -4,18 +4,20 @@ const auth = require('../middleware/auth');
 const requirePremium = require('../middleware/requirePremium');
 const premiumController = require('../controllers/premiumController');
 
+const { aiLimiter } = require('../middleware/rateLimiter');
+
 // All premium routes require auth + premium plan
 router.use(auth);
 router.use(requirePremium);
 
 // Advanced AI Study Modes
-router.post('/documents/:id/mindmap', premiumController.generateMindMap);
-router.post('/documents/:id/concepts', premiumController.generateConcepts);
-router.post('/documents/:id/multi-summary', premiumController.generateMultiLevelSummary);
+router.post('/documents/:id/mindmap', aiLimiter, premiumController.generateMindMap);
+router.post('/documents/:id/concepts', aiLimiter, premiumController.generateConcepts);
+router.post('/documents/:id/multi-summary', aiLimiter, premiumController.generateMultiLevelSummary);
 
 // Smart Document Analytics
-router.post('/documents/:id/analytics', premiumController.generateDocumentAnalytics);
-router.post('/documents/:id/glossary', premiumController.generateGlossary);
+router.post('/documents/:id/analytics', aiLimiter, premiumController.generateDocumentAnalytics);
+router.post('/documents/:id/glossary', aiLimiter, premiumController.generateGlossary);
 router.get('/analytics/weak-areas', premiumController.getWeakAreas);
 
 module.exports = router;

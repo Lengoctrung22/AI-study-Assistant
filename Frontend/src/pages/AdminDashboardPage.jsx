@@ -269,6 +269,21 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleUpdateRole = async (targetUser, newRole) => {
+    if (targetUser._id === user?._id && newRole === 'user') {
+      return toast.error('Bạn không thể tự hạ quyền tài khoản của chính mình');
+    }
+    if (!window.confirm(`Bạn có chắc muốn chuyển quyền tài khoản "${targetUser.name}" sang "${newRole === 'admin' ? 'Quản trị viên' : 'Thành viên'}"?`)) return;
+
+    try {
+      await api.put(`/admin/users/${targetUser._id}/role`, { role: newRole });
+      toast.success(`Đã cập nhật quyền cho "${targetUser.name}"`);
+      fetchUsers();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Cập nhật quyền thất bại');
+    }
+  };
+
   const handleDeleteUser = async (user) => {
     if (!window.confirm(`Bạn có chắc chắn muốn xóa người dùng "${user.name}"?\nTất cả tài liệu và lịch sử chat của họ sẽ bị xóa vĩnh viễn.`)) return;
     try {
@@ -725,9 +740,16 @@ export default function AdminDashboardPage() {
                         </td>
                         <td>{u.email}</td>
                         <td>
-                          <span className={`badge ${u.role === 'admin' ? 'badge-danger' : 'badge-info'}`}>
-                            {u.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
-                          </span>
+                          <select
+                            className={`badge ${u.role === 'admin' ? 'badge-danger' : 'badge-info'}`}
+                            value={u.role}
+                            onChange={(e) => handleUpdateRole(u, e.target.value)}
+                            style={{ cursor: 'pointer', border: '1px solid currentColor', padding: '4px 8px', borderRadius: '12px', background: 'transparent' }}
+                            title="Nhấp để thay đổi quyền hạn"
+                          >
+                            <option value="user" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>Thành viên</option>
+                            <option value="admin" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>Quản trị viên</option>
+                          </select>
                         </td>
                         <td>
                           <span className={`badge ${u.plan === 'premium' ? 'badge-success' : 'badge-warning'}`}>

@@ -210,6 +210,15 @@ exports.summarizeDocument = async (req, res, next) => {
 // POST /api/documents/:id/explain
 exports.explainText = async (req, res, next) => {
   try {
+    const document = await Document.findOne({
+      _id: req.params.id,
+      userId: req.user._id,
+    });
+
+    if (!document) {
+      return res.status(404).json({ message: 'Không tìm thấy tài liệu' });
+    }
+
     const { text, context, level } = req.body;
 
     if (!text || typeof text !== 'string' || !text.trim()) {
